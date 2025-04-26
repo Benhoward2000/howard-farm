@@ -22,8 +22,10 @@ jobs:
       - name: 📦 Install dependencies
         run: npm install
 
-      - name: 🛠️ Build React app
-        run: npm run build
+      - name: 🛠️ Inject environment variables and build React app
+        run: |
+          echo "REACT_APP_GOOGLE_MAPS_API_KEY=${{ secrets.REACT_APP_GOOGLE_MAPS_API_KEY }}" >> .env
+          npm run build
 
       - name: 🚀 Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
@@ -33,5 +35,6 @@ jobs:
           action: "upload"
           app_location: "/"        # Root of your React app
           output_location: "build" # The folder containing the built site
+
 
 
