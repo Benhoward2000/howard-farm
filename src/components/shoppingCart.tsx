@@ -39,23 +39,26 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
   const elements = useElements();
   const streetInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if ((window as any).google && !autocompleteService) {
-      setAutocompleteService(new google.maps.places.AutocompleteService());
-      setSessionToken(new google.maps.places.AutocompleteSessionToken());
-    }
-  }, []);
+  // Create autocompleteService and sessionToken when Google Maps is loaded
+useEffect(() => {
+  if ((window as any).google) {
+    setAutocompleteService(new google.maps.places.AutocompleteService());
+    setSessionToken(new google.maps.places.AutocompleteSessionToken());
+  }
+}, []);
 
-  useEffect(() => {
-    if (autocompleteService && streetInput.length > 2 && sessionToken && userTyping) {
-      autocompleteService.getPlacePredictions(
-        { input: streetInput, sessionToken },
-        (predictions) => setSuggestions(predictions || [])
-      );
-    } else {
-      setSuggestions([]);
-    }
-  }, [streetInput, autocompleteService, sessionToken, userTyping]);
+// Fetch predictions when user types
+useEffect(() => {
+  if (autocompleteService && streetInput.length > 2 && sessionToken && userTyping) {
+    autocompleteService.getPlacePredictions(
+      { input: streetInput, sessionToken },
+      (predictions) => setSuggestions(predictions || [])
+    );
+  } else {
+    setSuggestions([]);
+  }
+}, [streetInput, autocompleteService, sessionToken, userTyping]);
+
 
   useEffect(() => {
     const fetchRates = async () => {
@@ -123,25 +126,7 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
     }
   }, [user, useAccountAddress]);
 
-  const handlePlaceSelect = (placeId: string, description: string) => {
-    const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ placeId }, (results, status) => {
-      if (status === "OK" && results && results.length > 0) {
-        const address = results[0].address_components;
-        const get = (type: string) => address.find((a) => a.types.includes(type))?.long_name || "";
-
-        setShipping((prev) => ({
-          ...prev,
-          street: `${get("street_number")} ${get("route")}`,
-          city: get("locality") || get("sublocality") || "",
-          state: get("administrative_area_level_1"),
-          zip: get("postal_code"),
-        }));
-        setStreetInput(description);
-        setSuggestions([]);
-      }
-    });
-  };
+  
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
