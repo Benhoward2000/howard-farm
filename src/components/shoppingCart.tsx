@@ -334,39 +334,39 @@ useEffect(() => {
     <ul className="absolute bg-white border rounded mt-1 w-full shadow-lg z-10">
       {suggestions.map((s) => (
         <li
-          key={s.place_id}
-          className="p-2 hover:bg-gray-100 cursor-pointer"
-          onMouseDown={(e) => {
-            e.preventDefault(); // ✅ stops blur/focus problems
-          
-            const geocoder = new window.google.maps.Geocoder();
-            geocoder.geocode({ placeId: s.place_id }, (results, status) => {
-              if (status === "OK" && results && results.length > 0) {
-                const address = results[0].address_components;
-                const get = (type: string) =>
-                  address.find((a) => a.types.includes(type))?.long_name || "";
-          
-                const parsedStreet = `${get("street_number")} ${get("route")}`;
-                setStreetInput(parsedStreet);
-                setUserTyping(false); // ✅ helps prevent re-query
-          
-                setShipping((prev) => ({
-                  ...prev,
-                  street: parsedStreet,
-                  city: get("locality") || get("sublocality") || "",
-                  state: get("administrative_area_level_1"),
-                  zip: get("postal_code"),
-                }));
-          
-                // ✅ Clear AFTER geocoder finishes
-                setTimeout(() => setSuggestions([]), 100);
-              }
-            });
-          }}
-          
-        >
-          {s.description}
-        </li>
+        key={s.place_id}
+        className="p-2 hover:bg-gray-100 cursor-pointer"
+        onMouseDown={(e) => {
+          e.preventDefault(); // ✅ Prevents blur
+      
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ placeId: s.place_id }, (results, status) => {
+            if (status === "OK" && results && results.length > 0) {
+              const address = results[0].address_components;
+              const get = (type: string) => address.find((a) => a.types.includes(type))?.long_name || "";
+      
+              const parsedStreet = `${get("street_number")} ${get("route")}`.trim();
+      
+              setShipping((prev) => ({
+                ...prev,
+                street: parsedStreet,
+                city: get("locality") || get("sublocality") || "",
+                state: get("administrative_area_level_1"),
+                zip: get("postal_code"),
+              }));
+      
+              setStreetInput(parsedStreet);
+              setUserTyping(false);
+      
+              // ✅ Delay clearing suggestions to allow React to update first
+              setTimeout(() => setSuggestions([]), 200);
+            }
+          });
+        }}
+      >
+        {s.description}
+      </li>
+      
       ))}
     </ul>
   )}
