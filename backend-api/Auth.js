@@ -91,6 +91,7 @@ router.post("/logout", (req, res) => {
 
 
 router.get("/me", async (req, res) => {
+  console.log("🧠 /me hit — session is:", req.session); // 👈 Add this line
   if (!req.session.user) return res.status(401).json({ message: "Not logged in" });
 
   try {

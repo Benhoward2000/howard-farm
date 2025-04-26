@@ -17,6 +17,8 @@ interface OrderConfirmationProps {
     Zip: string;
     Email: string;
     Phone: string;
+    ShippingMethod?: string; // ✅ NEW
+    ShippingCost?: number;    // ✅ NEW
   } | null;
 }
 
@@ -47,21 +49,32 @@ const OrderConfirmation: React.FC<OrderConfirmationProps> = ({ order }) => {
       </div>
 
       <div className="mt-4">
-        <h3 className="font-semibold">Items Ordered</h3>
-        <p>
-          {order.Quantity} × {order.ProductName} @ $
-          {typeof order.Price === "number" ? order.Price.toFixed(2) : "0.00"}
-        </p>
-        <p>
-          Total: <strong>
-            ${typeof order.Price === "number" && typeof order.Quantity === "number"
-              ? (order.Quantity * order.Price).toFixed(2)
-              : "0.00"}
-          </strong>
-        </p>
-        <p>Status: {order.OrderStatus}</p>
-        {order.TrackingNumber && <p>Tracking: {order.TrackingNumber}</p>}
-      </div>
+  <h3 className="font-semibold">Items Ordered</h3>
+  <p>
+    {order.Quantity} × {order.ProductName} @ $
+    {typeof order.Price === "number" ? order.Price.toFixed(2) : "0.00"}
+  </p>
+
+  {/* ✅ NEW: Show Shipping */}
+  {order.ShippingMethod && (
+    <p className="mt-2">
+      Shipping: <strong>{order.ShippingMethod}</strong> – ${order.ShippingCost?.toFixed(2) ?? "0.00"}
+    </p>
+  )}
+
+  {/* ✅ Updated Total Calculation */}
+  <p className="mt-2">
+    Total: <strong>
+      ${typeof order.Price === "number" && typeof order.Quantity === "number"
+        ? ((order.Quantity * order.Price) + (order.ShippingCost || 0)).toFixed(2)
+        : "0.00"}
+    </strong>
+  </p>
+
+  <p>Status: {order.OrderStatus}</p>
+  {order.TrackingNumber && <p>Tracking: {order.TrackingNumber}</p>}
+</div>
+
     </div>
   );
 };

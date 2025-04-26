@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
 import apiBaseUrl from "../config";
+import { Menu, X } from "lucide-react";
 
 interface NavbarProps {
   setPage: (page: string) => void;
@@ -20,7 +20,7 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
     ...(user?.isAdmin
       ? [
           { label: "Products", page: "Admin" },
-          { label: "Orders", page: "AdminOrders" } // ✅ Added here
+          { label: "Orders", page: "AdminOrders" },
         ]
       : []),
     { label: user ? `Account (${user.name})` : "Account", page: "Account" },
@@ -33,27 +33,21 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
 
   const handleLogout = async () => {
     try {
-        await fetch(`${apiBaseUrl}/api/auth/logout`, {
-            method: "POST",
-            credentials: "include",
-          });         
+      await fetch(`${apiBaseUrl}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
       setUser(null);
-      setPage("Home"); // optional: redirect to home or login
+      setPage("Home");
     } catch (err) {
       console.error("Logout failed", err);
     }
   };
-  
-  const buttonClass =
-    "w-11/12 max-w-xs py-2 rounded-xl bg-[#a8936a] text-white font-semibold text-lg hover:bg-[#967f55] transition duration-300";
-
-  const logoutClass =
-    "w-11/12 max-w-xs py-2 rounded-xl bg-red-500 text-white font-semibold text-lg hover:bg-red-700 transition duration-300";
 
   return (
     <div className="w-full px-4 py-4">
       {/* Desktop Header */}
-      <div className="hidden md:flex justify-between items-center">
+      <div className="hidden lg:flex w-full items-center justify-between px-8 py-4">
         <div className="flex items-center gap-4">
           <img
             src="https://howardfarmblob.blob.core.windows.net/websiteimages/logo.png"
@@ -66,30 +60,30 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
           </div>
         </div>
 
-        <div className="flex gap-6">
+        <div className="flex flex-wrap gap-4 justify-end flex-1">
           {navItems.map((item) => (
             <button
               key={item.label}
               onClick={() => handleNavClick(item.page)}
-              className="text-[#4a3a28] bg-[#f3f5f9] hover:bg-[#e7e4db] px-4 py-2 rounded-md font-medium transition"
+              className="text-[#4a3a28] bg-[#f3f5f9] hover:bg-[#e7e4db] px-5 py-2.5 text-base rounded-md font-medium transition whitespace-nowrap"
             >
               {item.label}
             </button>
           ))}
           {user && (
             <button
-            onClick={handleLogout}
-            className="text-red-500 hover:text-red-700 font-medium transition"
-          >
-            Logout
-          </button>          
+              onClick={handleLogout}
+              className="text-red-500 hover:text-red-700 text-base font-medium transition whitespace-nowrap"
+            >
+              Logout
+            </button>
           )}
         </div>
       </div>
 
-      {/* Mobile Header */}
-      <div className="flex justify-between items-center md:hidden">
-        <div className="flex items-center gap-4">
+      {/* Mobile + Tablet Header */}
+      <div className="flex justify-between items-center lg:hidden">
+        <div className="flex items-center gap-4 min-w-[250px] max-w-[50%] flex-shrink">
           <img
             src="https://howardfarmblob.blob.core.windows.net/websiteimages/logo.png"
             alt="Howard's Farm Logo"
@@ -104,9 +98,9 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
         {!menuOpen && (
           <button
             onClick={() => setMenuOpen(true)}
-            className="w-10 h-10 flex items-center justify-center bg-[#f5efe5] text-[#4a3a28] rounded-md shadow-md hover:bg-[#e8dcc6] transition"
+            className="w-10 h-10 flex items-center justify-center bg-[#f5efe5] rounded-md shadow-md hover:bg-[#e8dcc6] transition"
           >
-            <Menu size={20} />
+            <Menu className="w-6 h-6 text-[#4a3a28]" strokeWidth={2} />
           </button>
         )}
       </div>
@@ -115,16 +109,16 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
         <div className="fixed inset-0 z-50 bg-white text-[#4a3a28] flex flex-col items-center pt-20 space-y-6">
           <button
             onClick={() => setMenuOpen(false)}
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-[#f5efe5] text-[#4a3a28] rounded-md shadow-md hover:bg-[#e8dcc6] transition"
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-[#f5efe5] rounded-md shadow-md hover:bg-[#e8dcc6] transition"
           >
-            <X size={20} />
+            <X className="w-6 h-6 text-[#4a3a28]" strokeWidth={2} />
           </button>
 
           {navItems.map((item) => (
             <button
               key={item.label}
               onClick={() => handleNavClick(item.page)}
-              className={buttonClass}
+              className="w-11/12 max-w-xs py-2 rounded-xl bg-[#a8936a] text-white font-semibold text-lg hover:bg-[#967f55] transition duration-300"
             >
               {item.label}
             </button>
@@ -136,7 +130,7 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
                 setUser(null);
                 setMenuOpen(false);
               }}
-              className={logoutClass}
+              className="w-11/12 max-w-xs py-2 rounded-xl bg-red-500 text-white font-semibold text-lg hover:bg-red-700 transition duration-300"
             >
               Logout
             </button>
@@ -148,6 +142,11 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
 };
 
 export default Navbar;
+
+
+
+
+
 
 
 

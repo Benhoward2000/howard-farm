@@ -2,7 +2,9 @@
   "name": "howard-farm",
   "version": "0.1.0",
   "private": true,
+  "proxy": "http://localhost:8080",
   "dependencies": {
+    "@react-google-maps/api": "^2.20.6",
     "@stripe/react-stripe-js": "^3.5.1",
     "@stripe/stripe-js": "^6.1.0",
     "@testing-library/jest-dom": "^5.17.0",

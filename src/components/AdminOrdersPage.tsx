@@ -3,7 +3,6 @@ import axios from "axios";
 import "./AdminPage.css";
 import apiBaseUrl from "../config";
 
-
 interface Order {
   orderId: number;
   productId: number;
@@ -22,6 +21,8 @@ interface Order {
   zip: string;
   email: string;
   phone: string;
+  shippingMethod?: string; // ✅ NEW
+  shippingCost?: number;    // ✅ NEW
 }
 
 const AdminOrdersPage: React.FC = () => {
@@ -42,37 +43,27 @@ const AdminOrdersPage: React.FC = () => {
       setMessage("❌ Failed to load orders.");
     }
   };
-  
- 
+
   const updateOrder = async (order: Order) => {
     try {
-        await axios.put(
-            `${apiBaseUrl}/api/admin/orders/${order.orderId}`,
-            {
-              orderStatus: order.orderStatus,
-              trackingNumber: order.trackingNumber,
-            },
-            { withCredentials: true }
-          );
-          
-  
-      setMessage("✅ Order updated.");
-  
-      // ✅ Manually update local state without waiting for re-fetch
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.orderId === order.orderId ? { ...o, ...order } : o
-        )
+      await axios.put(
+        `${apiBaseUrl}/api/admin/orders/${order.orderId}`,
+        {
+          orderStatus: order.orderStatus,
+          trackingNumber: order.trackingNumber,
+        },
+        { withCredentials: true }
       );
-  
-      // Optional: re-fetch after short delay if needed
-      // setTimeout(fetchOrders, 500);
+
+      setMessage("✅ Order updated.");
+      setOrders((prev) =>
+        prev.map((o) => (o.orderId === order.orderId ? { ...o, ...order } : o))
+      );
     } catch (err) {
       console.error("Update error:", err);
       setMessage("❌ Failed to update order.");
     }
   };
-  
 
   useEffect(() => {
     fetchOrders();
@@ -82,19 +73,15 @@ const AdminOrdersPage: React.FC = () => {
     const matchesSearch = order.productName
       .toLowerCase()
       .includes(searchText.toLowerCase());
-
     const matchesStatus = statusFilter ? order.orderStatus === statusFilter : true;
-
     const createdAt = new Date(order.createdAt);
     const now = new Date();
-
     let matchesDate = true;
     if (dateFilter === "7") {
       matchesDate = createdAt >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     } else if (dateFilter === "30") {
       matchesDate = createdAt >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
-
     return matchesSearch && matchesStatus && matchesDate;
   });
 
@@ -144,8 +131,14 @@ const AdminOrdersPage: React.FC = () => {
             <p><strong>Qty:</strong> {order.quantity} @ ${order.price}</p>
             <p><strong>Customer:</strong> {order.fullName || "N/A"}</p>
             <p>
-              <strong>Shipping:</strong> {order.street || ""}, {order.city || ""}, {order.state || ""} {order.zip || ""}
+              <strong>Shipping Address:</strong> {order.street || ""}, {order.city || ""}, {order.state || ""} {order.zip || ""}
             </p>
+            {/* ✅ Show shipping method and cost */}
+            {order.shippingMethod && (
+              <p>
+                <strong>Shipping Method:</strong> {order.shippingMethod} - ${order.shippingCost?.toFixed(2) ?? "0.00"}
+              </p>
+            )}
             <p>
               <strong>Email:</strong> {order.email || "N/A"} | <strong>Phone:</strong> {order.phone || "N/A"}
             </p>
@@ -160,37 +153,33 @@ const AdminOrdersPage: React.FC = () => {
               </p>
             )}
 
-<div className="admin-field">
-  <label>Status</label>
-  <select
-  className={`border rounded px-2 py-1 ${
-    order.orderStatus === "Shipped"
-      ? "text-blue-600"
-      : order.orderStatus === "Delivered"
-      ? "text-green-600"
-      : order.orderStatus === "Cancelled"
-      ? "text-red-600"
-      : "text-black"
-  }`}
-  value={order.orderStatus}
-  onChange={(e) =>
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.orderId === order.orderId
-          ? { ...o, orderStatus: e.target.value }
-          : o
-      )
-    )
-  }
->
-  <option value="Pending" style={{ color: "black" }}>Pending</option>
-  <option value="Shipped" style={{ color: "blue" }}>Shipped</option>
-  <option value="Delivered" style={{ color: "green" }}>Delivered</option>
-  <option value="Cancelled" style={{ color: "red" }}>Cancelled</option>
-</select>
-
-</div>
-
+            <div className="admin-field">
+              <label>Status</label>
+              <select
+                className={`border rounded px-2 py-1 ${
+                  order.orderStatus === "Shipped"
+                    ? "text-blue-600"
+                    : order.orderStatus === "Delivered"
+                    ? "text-green-600"
+                    : order.orderStatus === "Cancelled"
+                    ? "text-red-600"
+                    : "text-black"
+                }`}
+                value={order.orderStatus}
+                onChange={(e) =>
+                  setOrders((prev) =>
+                    prev.map((o) =>
+                      o.orderId === order.orderId ? { ...o, orderStatus: e.target.value } : o
+                    )
+                  )
+                }
+              >
+                <option value="Pending">Pending</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
 
             <div className="admin-field">
               <label>Tracking Number</label>
@@ -221,6 +210,7 @@ const AdminOrdersPage: React.FC = () => {
 };
 
 export default AdminOrdersPage;
+
 
 
 

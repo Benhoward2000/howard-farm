@@ -11,30 +11,38 @@ import CreateAccount from './components/CreateAccount';
 import AccountPage from './components/AccountPage';
 import Navbar from './components/Navbar';
 import AdminOrdersPage from './components/AdminOrdersPage';
-import OrderConfirmation from './components/OrderConfirmation'; // ✅ Import
+import OrderConfirmation from './components/OrderConfirmation';
 import apiBaseUrl from "./config";
+import { LoadScript } from "@react-google-maps/api";
 
 const App = () => {
   const [currentPage, setPage] = useState<string>('Home');
   const [cart, setCart] = useState<Product[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [lastOrder, setLastOrder] = useState<any>(null); // ✅ Add state for last order
+  const [lastOrder, setLastOrder] = useState<any>(null);
 
-  
-const fetchUser = async () => {
-  try {
-    const res = await fetch(`${apiBaseUrl}/api/auth/me`, {
-      credentials: "include",
-    });
-    if (res.ok) {
+  const fetchUser = async () => {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/auth/me`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        setUser(null);
+        return;
+      }
+
       const data = await res.json();
-      setUser(data);
+      if (data?.email || data?.username || data?.id) {
+        setUser(data);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error("Error fetching current user:", err);
+      setUser(null);
     }
-  } catch (err) {
-    console.error("Error fetching current user:", err);
-  }
-};
-
+  };
 
   useEffect(() => {
     fetchUser();
@@ -49,7 +57,7 @@ const fetchUser = async () => {
       case 'Contact':
         return <ContactPage />;
       case 'Shop':
-        return <StorePage cart={cart} setCart={setCart} />;
+        return <StorePage cart={cart} setCart={setCart} setPage={setPage} />;
       case 'Checkout':
         return (
           <ShoppingCart
@@ -57,11 +65,11 @@ const fetchUser = async () => {
             setCart={setCart}
             user={user}
             setPage={setPage}
-            setLastOrder={setLastOrder} // ✅ Pass the order setter
+            setLastOrder={setLastOrder}
           />
         );
       case 'Confirmation':
-        return <OrderConfirmation order={lastOrder} />; // ✅ Pass order to confirmation
+        return <OrderConfirmation order={lastOrder} />;
       case 'Admin':
         return user?.isAdmin ? (
           <AdminPage />
@@ -92,16 +100,22 @@ const fetchUser = async () => {
   };
 
   return (
-    <div className="App">
-      <header className="app-header">
-        <Navbar setPage={setPage} user={user} setUser={setUser} />
-      </header>
-      <main>{renderPage()}</main>
-    </div>
+    <LoadScript
+      googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY as string}
+      libraries={["places"]}
+    >
+      <div className="App">
+        <header className="app-header">
+          <Navbar setPage={setPage} user={user} setUser={setUser} />
+        </header>
+        <main>{renderPage()}</main>
+      </div>
+    </LoadScript>
   );
 };
 
 export default App;
+
 
 
 

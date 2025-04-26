@@ -8,11 +8,14 @@ const nodemailer = require("nodemailer");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { sql, poolPromise } = require("./db");
 const authRoutes = require("./Auth");
-
+const router = express.Router();
+const fetch = require("node-fetch");
 const app = express();
+const EASYPOST_API_KEY = process.env.EASYPOST_API_KEY; // load from .env
 const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:8080",
   "https://howardsfarm.org",
   "https://www.howardsfarm.org",
   "https://howards-farm-app-c0cmbderahfva9er.westus2-01.azurewebsites.net"
@@ -26,9 +29,13 @@ if (process.env.NODE_ENV === "production") {
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const normalizedOrigin = origin?.replace(/\/$/, ""); // remove trailing slash
+    console.log("🌐 Incoming origin:", normalizedOrigin);
+
+    if (!origin || allowedOrigins.includes(normalizedOrigin)) {
       callback(null, true);
     } else {
+      console.log("🚫 Blocked by CORS:", normalizedOrigin);
       callback(new Error("Not allowed by CORS"));
     }
   },
@@ -42,12 +49,12 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      //secure: false,         // 🔑 false for local HTTP; only true for HTTPS
-      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 1000 * 60 * 60 * 2 // 2 hours
     }
+    
   })
 );
 
@@ -61,11 +68,205 @@ function isAuthenticated(req, res, next) {
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/shipping", router); // 👈 this exposes /api/shipping/validate-address
 
 // Root test route
 app.get("/", (req, res) => {
   res.send("Howard's Farm API is running.");
 });
+
+
+
+// 📦 EasyPost Validate Address
+router.post("/validate-address", async (req, res) => {
+  const { street, city, state, zip } = req.body;
+  // ✅ Convert full state name to abbreviation
+  const stateMap = {
+    "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
+    "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
+    "Hawaii": "HI", "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA", "Kansas": "KS",
+    "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD", "Massachusetts": "MA",
+    "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS", "Missouri": "MO", "Montana": "MT",
+    "Nebraska": "NE", "Nevada": "NV", "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM",
+    "New York": "NY", "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK",
+    "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI", "South Carolina": "SC",
+    "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT", "Vermont": "VT",
+    "Virginia": "VA", "Washington": "WA", "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
+  };
+
+  const fixedState = stateMap[state] || state;
+
+  const requestBody = {
+    address: {
+      street1: street,
+      city,
+      state: fixedState,
+      zip,
+      country: "US",
+      verify: ["delivery"],
+    },
+  };
+
+  // 🔍 Log what we're sending
+  console.log("📦 Sending address to EasyPost for validation:", requestBody);
+
+  try {
+    const epRes = await fetch("https://api.easypost.com/v2/addresses", {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + Buffer.from(EASYPOST_API_KEY + ":").toString("base64"),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const data = await epRes.json();
+
+    // 🔍 Log the raw EasyPost response
+    console.log("📬 EasyPost response:", data);
+
+    // ✅ Updated validation handling
+const wasValidated = data.verifications?.delivery?.success === true;
+
+// ✅ If no verifications object returned (test mode), treat as valid
+const treatAsValid = !data.verifications || Object.keys(data.verifications).length === 0;
+
+if (wasValidated || treatAsValid) {
+  res.json({ valid: true, address: data });
+} else {
+  const errorMessage = data.verifications?.delivery?.errors?.[0]?.message || "Invalid address";
+  res.status(400).json({ valid: false, message: errorMessage, raw: data });
+}
+
+  } catch (err) {
+    console.error("❌ EasyPost validation error:", err);
+    res.status(500).json({
+      valid: false,
+      message: "Server error validating address",
+      raw: err,
+    });
+  }
+});
+
+
+// 📦 EasyPost Calculate Shipping Rates
+router.post("/rates", async (req, res) => {
+  const { street, city, state, zip, cartItems } = req.body;
+
+  if (!street || !city || !state || !zip || !Array.isArray(cartItems)) {
+    return res.status(400).json({ error: "Missing address or cart items" });
+  }
+
+  try {
+    const toAddress = {
+      street1: street,
+      city,
+      state,
+      zip,
+      country: "US",
+    };
+
+    const fromAddress = {
+      street1: "32802 Pittsburg Road",
+      city: "Saint Helens",
+      state: "OR",
+      zip: "97051",
+      country: "US",
+    };
+
+    const totalWeightOz = cartItems.reduce((sum, item) => {
+      const weightOz = parseFloat(item.weight);
+      const qty = parseInt(item.quantity) || 1;
+    
+      if (isNaN(weightOz)) {
+        console.warn("⚠️ Invalid weight for item:", item);
+        return sum;
+      }
+    
+      return sum + weightOz * qty;
+    }, 0);
+    
+
+    const parcel = {
+      weight: parseFloat(totalWeightOz.toFixed(2)), // ✅ Keep weight as number
+      length: 6,
+      width: 6,
+      height: 6,
+    };
+    
+    
+    
+    console.log("📦 Parcel weight (oz):", totalWeightOz);
+    console.log("🛒 Cart items:", cartItems);
+    console.log("🧪 Parcel for EasyPost:", parcel);
+    console.log("🔑 EASYPOST_API_KEY:", process.env.EASYPOST_API_KEY);
+    // Fix state abbreviations for both to_address and from_address
+   
+    const stateMap = {
+      "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
+      "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
+      "Hawaii": "HI", "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA", "Kansas": "KS",
+      "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD", "Massachusetts": "MA",
+      "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS", "Missouri": "MO", "Montana": "MT",
+      "Nebraska": "NE", "Nevada": "NV", "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM",
+      "New York": "NY", "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK",
+      "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI", "South Carolina": "SC",
+      "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT", "Vermont": "VT",
+      "Virginia": "VA", "Washington": "WA", "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
+    };
+    
+    
+
+// Replace state names with abbreviations if needed
+if (toAddress?.state) {
+  toAddress.state = stateMap[toAddress.state] || toAddress.state;
+}
+if (fromAddress?.state) {
+  fromAddress.state = stateMap[fromAddress.state] || fromAddress.state;
+}
+
+    
+    const shipmentResponse = await fetch("https://api.easypost.com/v2/shipments", {
+      method: "POST",
+      headers: {
+        
+        Authorization: "Basic " + Buffer.from(process.env.EASYPOST_API_KEY + ":").toString("base64"),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        shipment: {
+          to_address: toAddress,
+          from_address: fromAddress,
+          parcel,
+        },
+      }),
+    });
+
+    const shipmentText = await shipmentResponse.text();
+console.log("🛑 Raw EasyPost response:", shipmentText);
+const shipmentData = JSON.parse(shipmentText);
+
+    if (shipmentData.error) {
+      throw new Error(shipmentData.error.message);
+    }
+
+    const rates = shipmentData.rates.map((rate) => ({
+      carrier: rate.carrier,
+      service: rate.service,
+      rate: parseFloat(rate.rate),
+      delivery_days: rate.delivery_days,
+      rate_id: rate.id,
+    }));
+
+    res.json(rates);
+  } catch (err) {
+    console.error("Error fetching shipping rates:", err);
+    res.status(500).json({ error: "Failed to get shipping rates" });
+  }
+});
+
+module.exports = router;
+
 
 // Stripe PaymentIntent
 app.post("/create-payment-intent", async (req, res) => {
@@ -146,10 +347,22 @@ app.put("/products/:id/archive", isAuthenticated, async (req, res) => {
 });
 
 
-// Update product
+// ✅ Update product
 app.put("/products/:id", isAuthenticated, async (req, res) => {
   const { id } = req.params;
-  const { name, description, price, stock, imageURL, localPickupOnly, displayOrder } = req.body;
+  const {
+    name,
+    description,
+    price,
+    stock,
+    imageURL,
+    localPickupOnly,
+    displayOrder,
+    weight,
+    length,
+    width,
+    height
+  } = req.body;
 
   try {
     const pool = await poolPromise;
@@ -162,6 +375,10 @@ app.put("/products/:id", isAuthenticated, async (req, res) => {
       .input("img", sql.VarChar(255), imageURL)
       .input("pickup", sql.Bit, localPickupOnly)
       .input("order", sql.Int, displayOrder || 0)
+      .input("Weight", sql.Decimal(5, 2), weight)
+      .input("Length", sql.Decimal(5, 2), length)
+      .input("Width", sql.Decimal(5, 2), width)
+      .input("Height", sql.Decimal(5, 2), height)
       .query(`
         UPDATE Products
         SET Name = @name,
@@ -170,7 +387,11 @@ app.put("/products/:id", isAuthenticated, async (req, res) => {
             StockQty = @stock,
             ImageUrl = @img,
             LocalPickupOnly = @pickup,
-            DisplayOrder = @order
+            DisplayOrder = @order,
+            Weight = @Weight,
+            Length = @Length,
+            Width = @Width,
+            Height = @Height
         WHERE ProductId = @id
       `);
 
@@ -181,9 +402,10 @@ app.put("/products/:id", isAuthenticated, async (req, res) => {
   }
 });
 
+
 // Add product
 app.post("/products", isAuthenticated, async (req, res) => {
-  const { name, description, price, stock, imageURL, localPickupOnly, displayOrder } = req.body;
+  const { name, description, price, stock, imageURL, localPickupOnly, displayOrder, weight, length, width, height } = req.body;
   try {
     const pool = await poolPromise;
     await pool.request()
@@ -194,10 +416,15 @@ app.post("/products", isAuthenticated, async (req, res) => {
       .input("ImageUrl", sql.VarChar(255), imageURL)
       .input("LocalPickupOnly", sql.Bit, localPickupOnly)
       .input("DisplayOrder", sql.Int, displayOrder || 0)
-      .query(`
-        INSERT INTO Products (Name, Description, Price, StockQty, ImageUrl, LocalPickupOnly, DisplayOrder)
-        VALUES (@Name, @Description, @Price, @StockQty, @ImageUrl, @LocalPickupOnly, @DisplayOrder)
-      `);
+      .input("Weight", sql.Decimal(5, 2), weight)
+.input("Length", sql.Decimal(5, 2), length)
+.input("Width", sql.Decimal(5, 2), width)
+.input("Height", sql.Decimal(5, 2), height)
+.query(`
+  INSERT INTO Products (Name, Description, Price, StockQty, ImageUrl, LocalPickupOnly, DisplayOrder, Weight, Length, Width, Height)
+  VALUES (@Name, @Description, @Price, @StockQty, @ImageUrl, @LocalPickupOnly, @DisplayOrder, @Weight, @Length, @Width, @Height)
+`);
+
 
     res.status(201).send("Product added");
   } catch (err) {
@@ -223,11 +450,7 @@ app.delete("/products/:id", isAuthenticated, async (req, res) => {
 
 // Final checkout route (only one!)
 app.post("/checkout", async (req, res) => {
-  const { shippingInfo, cartItems } = req.body;
-
-  //console.log("📦 Incoming checkout request:");
-  //console.log("Shipping Info:", shippingInfo);
-  //console.log("Cart Items:", cartItems);
+  const { shippingInfo, shippingMethod, shippingCost, cartItems } = req.body; // ✅ NEW
 
   if (!shippingInfo || !Array.isArray(cartItems) || cartItems.length === 0) {
     return res.status(400).json({ error: "Missing shipping info or cart items." });
@@ -240,7 +463,6 @@ app.post("/checkout", async (req, res) => {
     await transaction.begin();
 
     const emailToUse = req.session.user?.email || shippingInfo.email;
-    //console.log("📧 Using email:", emailToUse);
 
     const shippingResult = await transaction.request()
       .input("FullName", sql.NVarChar, shippingInfo.fullName)
@@ -257,27 +479,25 @@ app.post("/checkout", async (req, res) => {
       `);
 
     const shippingId = shippingResult.recordset[0].Id;
-    //console.log("📬 Shipping inserted with ID:", shippingId);
-
     const insertedOrders = [];
 
     for (const item of cartItems) {
-      // Insert order
       const orderResult = await transaction.request()
         .input("ShippingId", sql.Int, shippingId)
         .input("ProductId", sql.Int, item.productId)
         .input("Quantity", sql.Int, item.quantity)
         .input("Price", sql.Decimal(10, 2), item.price)
         .input("OrderStatus", sql.NVarChar, "Pending")
+        .input("ShippingMethod", sql.NVarChar, shippingMethod) // ✅ NEW
+        .input("ShippingCost", sql.Decimal(10, 2), shippingCost) // ✅ NEW
         .query(`
-          INSERT INTO Orders (ShippingId, ProductId, Quantity, Price, CreatedAt, OrderStatus)
+          INSERT INTO Orders (ShippingId, ProductId, Quantity, Price, CreatedAt, OrderStatus, ShippingMethod, ShippingCost)
           OUTPUT INSERTED.*
-          VALUES (@ShippingId, @ProductId, @Quantity, @Price, GETDATE(), @OrderStatus)
+          VALUES (@ShippingId, @ProductId, @Quantity, @Price, GETDATE(), @OrderStatus, @ShippingMethod, @ShippingCost)
         `);
-    
+
       insertedOrders.push(orderResult.recordset[0]);
-    
-      // Subtract quantity from inventory
+
       await transaction.request()
         .input("ProductId", sql.Int, item.productId)
         .input("Quantity", sql.Int, item.quantity)
@@ -286,8 +506,7 @@ app.post("/checkout", async (req, res) => {
           SET StockQty = StockQty - @Quantity
           WHERE ProductId = @ProductId
         `);
-    }  
-      
+    }
 
     await transaction.commit();
 
@@ -296,14 +515,12 @@ app.post("/checkout", async (req, res) => {
       throw new Error("Inserted order is missing or invalid.");
     }
 
-    //console.log("🆔 Inserted Order ID:", insertedOrder.OrderId);
-
     const result = await pool.request()
       .input("OrderId", sql.Int, insertedOrder.OrderId)
       .query(`
         SELECT 
           o.OrderId, o.ProductId, o.Quantity, o.Price, o.CreatedAt, o.OrderStatus,
-          o.TrackingNumber, o.ShippedAt,
+          o.TrackingNumber, o.ShippedAt, o.ShippingMethod, o.ShippingCost, -- ✅ NEW
           p.Name AS ProductName,
           s.FullName, s.Street, s.City, s.State, s.Zip, s.Email, s.Phone
         FROM Orders o
@@ -313,14 +530,9 @@ app.post("/checkout", async (req, res) => {
       `);
 
     const orderDetails = result.recordset[0];
-    //console.log("📦 Order details fetched from DB:", orderDetails);
-
     const recipientEmail = orderDetails?.Email || shippingInfo.email;
-    //console.log("📤 Prepared to send to:", recipientEmail);
 
-    if (!recipientEmail) {
-      console.error("❌ No recipient email found. Skipping email.");
-    } else {
+    if (recipientEmail) {
       const transporter = nodemailer.createTransport({
         host: process.env.EMAIL_HOST,
         port: parseInt(process.env.EMAIL_PORT, 10),
@@ -333,7 +545,8 @@ app.post("/checkout", async (req, res) => {
 
       const price = typeof orderDetails.Price === "number" ? orderDetails.Price : 0;
       const quantity = typeof orderDetails.Quantity === "number" ? orderDetails.Quantity : 0;
-      const total = price * quantity;
+      const shippingFee = typeof orderDetails.ShippingCost === "number" ? orderDetails.ShippingCost : 0;
+      const total = price * quantity + shippingFee;
 
       const emailHtml = `
         <h2>Thank you for your order from Howard's Farm!</h2>
@@ -341,6 +554,7 @@ app.post("/checkout", async (req, res) => {
         <p><strong>Date:</strong> ${new Date(orderDetails.CreatedAt).toLocaleString()}</p>
         <h3>Items Ordered:</h3>
         <p>${quantity} × ${orderDetails.ProductName} @ $${price.toFixed(2)}</p>
+        <p><strong>Shipping:</strong> ${orderDetails.ShippingMethod || "N/A"} – $${shippingFee.toFixed(2)}</p>
         <p><strong>Total:</strong> $${total.toFixed(2)}</p>
         <h3>Shipping Address:</h3>
         <p>${orderDetails.FullName}<br>${orderDetails.Street}<br>${orderDetails.City}, ${orderDetails.State} ${orderDetails.Zip}</p>
@@ -354,11 +568,10 @@ app.post("/checkout", async (req, res) => {
           from: `"Howard's Farm" <${process.env.EMAIL_USER}>`,
           to: recipientEmail,
           replyTo: process.env.ORDER_REPLY_TO,
-          bcc: process.env.ORDER_BCC,  // ✅ Admin receives a copy
+          bcc: process.env.ORDER_BCC,
           subject: `Your Howard's Farm Order #${orderDetails.OrderId}`,
           html: emailHtml,
         });
-        //console.log("✅ Email sent to:", recipientEmail);
       } catch (emailErr) {
         console.error("❌ Email send failed:", emailErr.message);
       }
@@ -377,6 +590,7 @@ app.post("/checkout", async (req, res) => {
     res.status(500).json({ error: "Checkout failed" });
   }
 });
+
 
 // Admin: Get all orders with shipping and product info
 app.get("/api/admin/orders", isAuthenticated, async (req, res) => {

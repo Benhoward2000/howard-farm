@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Product } from "./StorePage";
-import "./ProductCard.css";
 
 interface Props {
   product: Product;
@@ -22,7 +21,6 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
   const showLowStock = availableStock > 0 && availableStock <= 5;
 
   useEffect(() => {
-    // Ensure selected quantity never exceeds remaining available stock
     if (selectedQuantity > availableStock) {
       setSelectedQuantity(Math.max(availableStock, 1));
     }
@@ -47,54 +45,64 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
   };
 
   return (
-    <div className="product-card-horizontal">
-      <div className="product-image-wrapper">
-        <img
-          src={product.imageURL}
-          alt={product.name}
-          className="product-image"
-        />
-      </div>
+    <div className="bg-white rounded-2xl shadow-md hover:shadow-lg transition duration-300 flex flex-col">
+      <div className="flex items-center justify-center bg-white h-48 md:h-56 lg:h-64 overflow-hidden">
+  <img
+    src={product.imageURL}
+    alt={product.name}
+    className="object-contain h-full max-w-full"
+  />
+</div>
 
-      <div className="product-details">
-        <h2 className="product-name">{product.name}</h2>
-        <p className="product-description">
-          <em>{product.description}</em>
-        </p>
-        <p className="product-stock">
-          Availability: <strong>{availableStock > 0 ? "In Stock" : "Out of Stock"}</strong>
-        </p>
 
-        {showLowStock && (
-          <p className="low-stock">Only {availableStock} left in stock!</p>
-        )}
-
-        {quantityInCart > 0 && (
-          <p style={{ color: "green" }}>
-            You have {quantityInCart} {quantityInCart === 1 ? "item" : "items"} currently in your cart.
+      <div className="p-4 flex flex-col justify-between grow">
+        <div>
+          <h2 className="text-lg font-bold mb-1">{product.name}</h2>
+          <p className="text-sm italic text-gray-600">{product.description}</p>
+          <p className="text-sm mt-1">
+            Availability:{" "}
+            <strong>{availableStock > 0 ? "In Stock" : "Out of Stock"}</strong>
           </p>
-        )}
+          {showLowStock && (
+            <p className="text-red-600 text-sm font-semibold">
+              Only {availableStock} left in stock!
+            </p>
+          )}
+          {quantityInCart > 0 && (
+            <p className="text-green-600 text-sm mt-1">
+              You have {quantityInCart} in your cart.
+            </p>
+          )}
+        </div>
 
-        <p className="product-price">${product.price.toFixed(2)}</p>
-        <p className="product-shipping">
-          {product.localPickupOnly ? "Local pickup only" : "Shipping available"}
-        </p>
+        <div className="mt-4">
+          <p className="text-xl font-bold">${product.price.toFixed(2)}</p>
+          <p className="text-sm text-gray-500">
+            {product.localPickupOnly ? "Local pickup only" : "Shipping available"}
+          </p>
+        </div>
 
-        <div className="cart-controls">
-          <div className="quantity-controls">
-            <button onClick={handleDecrease} disabled={selectedQuantity <= 1}>
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDecrease}
+              disabled={selectedQuantity <= 1}
+              className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+            >
               −
             </button>
-            <span>{selectedQuantity}</span>
+            <span className="font-semibold">{selectedQuantity}</span>
             <button
               onClick={handleIncrease}
               disabled={selectedQuantity >= availableStock}
+              className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
             >
               +
             </button>
           </div>
+
           <button
-            className="add-to-cart"
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
             onClick={handleAddToCart}
             disabled={!canAdd}
           >
@@ -107,6 +115,7 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
 };
 
 export default ProductCard;
+
 
 
 
