@@ -40,23 +40,26 @@ const AccountPage: React.FC<Props> = ({ user, setPage, refreshUser }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
-  useEffect(() => {
-    if ((window as any).google && !autocompleteService) {
-      setAutocompleteService(new google.maps.places.AutocompleteService());
-      setSessionToken(new google.maps.places.AutocompleteSessionToken());
-    }
-  }, []);
+ // Create autocompleteService and sessionToken when Google Maps is loaded
+useEffect(() => {
+  if ((window as any).google) {
+    setAutocompleteService(new google.maps.places.AutocompleteService());
+    setSessionToken(new google.maps.places.AutocompleteSessionToken());
+  }
+}, []);
 
-  useEffect(() => {
-    if (autocompleteService && streetInput.length > 2 && sessionToken) {
-      autocompleteService.getPlacePredictions(
-        { input: streetInput, sessionToken },
-        (predictions) => setSuggestions(predictions || [])
-      );
-    } else {
-      setSuggestions([]);
-    }
-  }, [streetInput, autocompleteService, sessionToken]);
+// Fetch predictions when user types
+useEffect(() => {
+  if (autocompleteService && streetInput.length > 2 && sessionToken) {
+    autocompleteService.getPlacePredictions(
+      { input: streetInput, sessionToken },
+      (predictions) => setSuggestions(predictions || [])
+    );
+  } else {
+    setSuggestions([]);
+  }
+}, [streetInput, autocompleteService, sessionToken]);
+
 
   const handlePlaceSelect = (placeId: string) => {
     const geocoder = new window.google.maps.Geocoder();
