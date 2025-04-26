@@ -15,6 +15,7 @@ import OrderConfirmation from './components/OrderConfirmation';
 import apiBaseUrl from "./config";
 import { LoadScript } from "@react-google-maps/api";
 
+
 const App = () => {
   const [currentPage, setPage] = useState<string>('Home');
   const [cart, setCart] = useState<Product[]>([]);
