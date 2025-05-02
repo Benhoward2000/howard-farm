@@ -32,8 +32,8 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow p-3 flex flex-col w-full max-w-xs text-sm">
-      <div className="h-40 flex items-center justify-center overflow-hidden">
+    <div className="w-full bg-white rounded-xl shadow p-4 flex flex-col text-sm">
+      <div className="h-44 flex items-center justify-center overflow-hidden">
         <img
           src={product.imageURL}
           alt={product.name}
@@ -41,9 +41,9 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
         />
       </div>
 
-      <div className="mt-3 grow flex flex-col justify-between">
+      <div className="mt-4 grow flex flex-col justify-between">
         <div className="space-y-1">
-          <h2 className="font-semibold text-base leading-tight">{product.name}</h2>
+          <h2 className="font-semibold text-base">{product.name}</h2>
           <p className="text-gray-600 italic">{product.description}</p>
           <p>
             <span className="text-gray-600">Status:</span>{" "}
@@ -71,7 +71,7 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
             <button
               onClick={() => setSelectedQuantity((q) => Math.max(1, q - 1))}
               disabled={selectedQuantity <= 1}
-              className="w-7 h-7 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+              className="w-8 h-8 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
             >
               −
             </button>
@@ -79,7 +79,7 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
             <button
               onClick={() => setSelectedQuantity((q) => Math.min(q + 1, availableStock))}
               disabled={selectedQuantity >= availableStock}
-              className="w-7 h-7 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+              className="w-8 h-8 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
             >
               +
             </button>
@@ -88,7 +88,7 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
           <button
             onClick={handleAddToCart}
             disabled={!canAdd}
-            className="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded disabled:bg-gray-400"
+            className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded disabled:bg-gray-400"
           >
             Add 🧺
           </button>
@@ -99,6 +99,7 @@ const ProductCard: React.FC<Props> = ({ product, cart, addToCart }) => {
 };
 
 export default ProductCard;
+
 
 
 
