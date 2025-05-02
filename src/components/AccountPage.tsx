@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { apiBaseUrl, googleMapsApiKey } from "../config";
+import { apiBaseUrl } from "../config";
 import { toast } from "react-toastify";
 
 interface Props {
@@ -39,13 +39,13 @@ const AccountPage: React.FC<Props> = ({ user, setPage, refreshUser }) => {
   const streetInputRef = useRef<HTMLInputElement>(null);
   const [userTyping, setUserTyping] = useState(false);
 
-  const [message, setMessage] = useState("");
+  //const [message, setMessage] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
-  const [passwordMessage, setPasswordMessage] = useState("");
+  //const [passwordMessage, setPasswordMessage] = useState("");
   
 
 
@@ -111,7 +111,7 @@ useEffect(() => {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordMessage("");
+    //setPasswordMessage("");
   
     if (newPassword !== confirmNewPassword) {
       toast.error(" New passwords do not match.");
@@ -155,7 +155,7 @@ useEffect(() => {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage("");
+    //setMessage("");
 
     try {
       const res = await fetch(`${apiBaseUrl}/api/auth/account/update`, {

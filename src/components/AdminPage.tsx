@@ -140,7 +140,7 @@ const AdminPage: React.FC = () => {
         className="mb-8 bg-[#a8936a] hover:bg-[#967f55] text-white font-semibold py-2 px-6 rounded transition"
         onClick={async () => {
           try {
-            const res = await axios.post(`${apiBaseUrl}/products`, {
+             await axios.post(`${apiBaseUrl}/products`, {
               name: "New Product",
               description: "",
               price: 0,
