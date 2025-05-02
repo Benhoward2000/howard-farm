@@ -292,16 +292,28 @@ app.post("/create-payment-intent", async (req, res) => {
 // Get active products (not archived) ordered by DisplayOrder
 // Get active products (non-archived)
 app.get("/products", async (req, res) => {
+  const { category } = req.query;
+
   try {
     console.log("🔌 Attempting DB connection...");
     const pool = await poolPromise;
     console.log("✅ Connected to DB");
 
-    const result = await pool.request().query(`
+    const request = pool.request();
+
+    let query = `
       SELECT * FROM Products 
-      WHERE IsArchived = 0 
-      ORDER BY DisplayOrder ASC
-    `);
+      WHERE IsArchived = 0
+    `;
+
+    if (category && category !== "All") {
+      query += " AND Category = @Category";
+      request.input("Category", sql.NVarChar, category);
+    }
+
+    query += " ORDER BY DisplayOrder ASC";
+
+    const result = await request.query(query);
 
     res.json(result.recordset);
   } catch (err) {
@@ -310,6 +322,7 @@ app.get("/products", async (req, res) => {
     res.status(500).send("Failed to fetch products");
   }
 });
+
 
 
 app.get("/products/all", isAuthenticated, async (req, res) => {
@@ -361,7 +374,8 @@ app.put("/products/:id", isAuthenticated, async (req, res) => {
     weight,
     length,
     width,
-    height
+    height,
+    category
   } = req.body;
 
   try {
@@ -379,6 +393,7 @@ app.put("/products/:id", isAuthenticated, async (req, res) => {
       .input("Length", sql.Decimal(5, 2), length)
       .input("Width", sql.Decimal(5, 2), width)
       .input("Height", sql.Decimal(5, 2), height)
+      .input("Category", sql.NVarChar(100), category || "")
       .query(`
         UPDATE Products
         SET Name = @name,
@@ -391,7 +406,8 @@ app.put("/products/:id", isAuthenticated, async (req, res) => {
             Weight = @Weight,
             Length = @Length,
             Width = @Width,
-            Height = @Height
+            Height = @Height,
+            Category = @Category
         WHERE ProductId = @id
       `);
 
@@ -405,7 +421,7 @@ app.put("/products/:id", isAuthenticated, async (req, res) => {
 
 // Add product
 app.post("/products", isAuthenticated, async (req, res) => {
-  const { name, description, price, stock, imageURL, localPickupOnly, displayOrder, weight, length, width, height } = req.body;
+  const { name, description, price, stock, imageURL, localPickupOnly, displayOrder, weight, length, width, height, category } = req.body;
   try {
     const pool = await poolPromise;
     await pool.request()
@@ -420,9 +436,10 @@ app.post("/products", isAuthenticated, async (req, res) => {
 .input("Length", sql.Decimal(5, 2), length)
 .input("Width", sql.Decimal(5, 2), width)
 .input("Height", sql.Decimal(5, 2), height)
+.input("Category", sql.NVarChar(100), category || "")
 .query(`
-  INSERT INTO Products (Name, Description, Price, StockQty, ImageUrl, LocalPickupOnly, DisplayOrder, Weight, Length, Width, Height)
-  VALUES (@Name, @Description, @Price, @StockQty, @ImageUrl, @LocalPickupOnly, @DisplayOrder, @Weight, @Length, @Width, @Height)
+  INSERT INTO Products (Name, Description, Price, StockQty, ImageUrl, LocalPickupOnly, DisplayOrder, Weight, Length, Width, Height, Category)
+  VALUES (@Name, @Description, @Price, @StockQty, @ImageUrl, @LocalPickupOnly, @DisplayOrder, @Weight, @Length, @Width, @Height, @Category)
 `);
 
 
@@ -435,18 +452,40 @@ app.post("/products", isAuthenticated, async (req, res) => {
 
 // Delete product
 app.delete("/products/:id", isAuthenticated, async (req, res) => {
+  const productId = parseInt(req.params.id, 10);
+
+  if (isNaN(productId)) {
+    return res.status(400).json({ error: "Invalid product ID" });
+  }
+
   try {
     const pool = await poolPromise;
+
+    // Check if product is in any orders
+    const result = await pool.request()
+      .input("ProductId", sql.Int, productId)
+      .query("SELECT COUNT(*) AS OrderCount FROM Orders WHERE ProductId = @ProductId");
+
+    const orderCount = result.recordset[0]?.OrderCount || 0;
+
+    if (orderCount > 0) {
+      return res.status(400).json({
+        error: "This product is associated with existing orders and cannot be deleted. Please archive it instead."
+      });
+    }
+
+    // Safe to delete
     await pool.request()
-      .input("ProductId", sql.Int, req.params.id)
+      .input("ProductId", sql.Int, productId)
       .query("DELETE FROM Products WHERE ProductId = @ProductId");
 
-    res.send("Product deleted");
+    res.json({ success: true, message: "Product deleted successfully" });
   } catch (err) {
     console.error("Delete error:", err.message);
-    res.status(500).send("Failed to delete product");
+    res.status(500).json({ error: "Failed to delete product" });
   }
 });
+
 
 // Final checkout route (only one!)
 app.post("/checkout", async (req, res) => {
