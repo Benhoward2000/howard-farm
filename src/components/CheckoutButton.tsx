@@ -1,7 +1,8 @@
 import React from 'react';
 import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
 import axios from 'axios';
-import apiBaseUrl from "../config";
+import { apiBaseUrl } from "../config";
+
 
 const CheckoutForm: React.FC<{ totalAmount: number }> = ({ totalAmount }) => {
   const stripe = useStripe();

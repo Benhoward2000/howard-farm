@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { Slide } from './HomePage';
-import './imageSlider.css';
+import React, { useState } from "react";
+import { Slide } from "./HomePage";
 
 interface Props {
   slides: Slide[];
@@ -22,20 +21,29 @@ const ImageSlider: React.FC<Props> = ({ slides }) => {
   };
 
   return (
-    <div className="slider">
-      <button className="arrow left-arrow" onClick={goToPrevious} aria-label="Previous Slide">
-      <span aria-hidden="true">❰</span>
+    <div className="relative w-full h-80 md:h-[28rem] lg:h-[32rem] overflow-hidden group">
+      {/* Image */}
+      <img
+        src={slides[currentIndex].url}
+        alt={slides[currentIndex].alt}
+        className="w-full h-full object-cover transition duration-700 ease-in-out"
+      />
+
+      {/* Left Arrow */}
+      <button
+        onClick={goToPrevious}
+        className="absolute top-1/2 left-4 transform -translate-y-1/2 bg-white bg-opacity-60 text-[#4a3a28] hover:bg-opacity-90 rounded-full w-10 h-10 flex items-center justify-center text-xl transition"
+        aria-label="Previous Slide"
+      >
         ❰
       </button>
-      <div className="slide">
-        <img
-          src={slides[currentIndex].url}
-          alt={slides[currentIndex].alt}
-          className="slide-image"
-        />
-      </div>
-      <button className="arrow right-arrow" onClick={goToNext} aria-label="Next Slide">
-      <span aria-hidden="true">❰</span>
+
+      {/* Right Arrow */}
+      <button
+        onClick={goToNext}
+        className="absolute top-1/2 right-4 transform -translate-y-1/2 bg-white bg-opacity-60 text-[#4a3a28] hover:bg-opacity-90 rounded-full w-10 h-10 flex items-center justify-center text-xl transition"
+        aria-label="Next Slide"
+      >
         ❱
       </button>
     </div>
@@ -43,4 +51,5 @@ const ImageSlider: React.FC<Props> = ({ slides }) => {
 };
 
 export default ImageSlider;
+
 

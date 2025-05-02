@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import apiBaseUrl from "../config";
+import { apiBaseUrl, googleMapsApiKey } from "../config";
+import { toast } from "react-toastify";
 
 interface Props {
   user: any;
@@ -27,7 +28,9 @@ const AccountPage: React.FC<Props> = ({ user, setPage, refreshUser }) => {
     city: user?.city || "",
     state: user?.state || "",
     zip: user?.zip || "",
+    marketingOptIn: user?.marketingOptIn || false,
   });
+  
 
   const [streetInput, setStreetInput] = useState(formData.street);
   const [suggestions, setSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
@@ -39,6 +42,14 @@ const AccountPage: React.FC<Props> = ({ user, setPage, refreshUser }) => {
   const [message, setMessage] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  
+
+
+
 
  // Create autocompleteService and sessionToken when Google Maps is loaded
 useEffect(() => {
@@ -89,7 +100,59 @@ useEffect(() => {
     }
     setFormData({ ...formData, [name]: value });
   };
+  const validatePassword = (password: string) => {
+    const lengthCheck = password.length >= 8;
+    const uppercaseCheck = /[A-Z]/.test(password);
+    const lowercaseCheck = /[a-z]/.test(password);
+    const numberCheck = /[0-9]/.test(password);
+    const specialCharCheck = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    return lengthCheck && uppercaseCheck && lowercaseCheck && numberCheck && specialCharCheck;
+  };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage("");
+  
+    if (newPassword !== confirmNewPassword) {
+      toast.error(" New passwords do not match.");
+      return;
+    }
+  
+    if (!validatePassword(newPassword)) {
+      toast.error(" Password must be at least 8 characters and include an uppercase letter, lowercase letter, number, and special character.");
+      return;
+    }
+  
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/auth/account/changepassword`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+  
+      const data = await res.json();
+  
+      if (!res.ok) {
+        toast.error(data.message || " Failed to change password.");
+      } else {
+        toast.success("✅ Password changed successfully! Redirecting to login...");
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+  
+        // Wait 1.5 seconds so the user sees the success message
+        setTimeout(() => {
+          setPage("Login"); // Redirect user back to Login page
+        }, 1500);
+      }
+    } catch (err) {
+      console.error("Password change error:", err);
+      toast.error("❌ Server error.");
+    }
+  };
+  
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("");
@@ -103,14 +166,14 @@ useEffect(() => {
       });
 
       if (res.ok) {
-        setMessage("✅ Address updated successfully!");
+        toast.success("Account updated successfully!");
         refreshUser?.();
       } else {
-        setMessage("❌ Failed to update address.");
+        toast.error(" Failed to update Account.");
       }
     } catch (err) {
       console.error("Error updating account:", err);
-      setMessage("❌ Something went wrong.");
+      toast.error(" Something went wrong.");
     }
   };
 
@@ -243,6 +306,21 @@ useEffect(() => {
             className="border rounded p-2"
           />
         </div>
+        <div className="flex items-center md:col-span-2 mt-2">
+  <input
+    type="checkbox"
+    id="marketingOptIn"
+    name="marketingOptIn"
+    checked={formData.marketingOptIn}
+    onChange={(e) =>
+      setFormData((prev) => ({ ...prev, marketingOptIn: e.target.checked }))
+    }
+    className="mr-2"
+  />
+  <label htmlFor="marketingOptIn" className="text-sm text-gray-700">
+    I want to receive farm updates, promotions, and news! 📬
+  </label>
+</div>
 
         <div className="md:col-span-2">
           <button
@@ -251,9 +329,53 @@ useEffect(() => {
           >
             💾 Save
           </button>
-          {message && <p className="mt-4 text-center">{message}</p>}
-        </div>
+                 </div>
       </form>
+      <h3 className="text-2xl font-bold mt-10 mb-4 text-center">🔒 Change Password</h3>
+
+<form className="grid gap-4 md:grid-cols-2" onSubmit={handlePasswordChange}>
+  <div className="flex flex-col md:col-span-2">
+    <label className="font-semibold mb-1">Old Password</label>
+    <input
+      type="password"
+      value={oldPassword}
+      onChange={(e) => setOldPassword(e.target.value)}
+      className="border rounded p-2"
+      required
+    />
+  </div>
+
+  <div className="flex flex-col md:col-span-2">
+    <label className="font-semibold mb-1">New Password</label>
+    <input
+      type="password"
+      value={newPassword}
+      onChange={(e) => setNewPassword(e.target.value)}
+      className="border rounded p-2"
+      required
+    />
+  </div>
+
+  <div className="flex flex-col md:col-span-2">
+    <label className="font-semibold mb-1">Confirm New Password</label>
+    <input
+      type="password"
+      value={confirmNewPassword}
+      onChange={(e) => setConfirmNewPassword(e.target.value)}
+      className="border rounded p-2"
+      required
+    />
+  </div>
+
+  <div className="md:col-span-2">
+    <button
+      type="submit"
+      className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+    >
+      🔒 Update Password
+    </button>
+     </div>
+</form>
 
       <h3 className="text-2xl font-bold mt-10 mb-4 text-center">📦 My Orders</h3>
 

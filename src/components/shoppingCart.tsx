@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Product } from "./StorePage";
 import CartCard from "./CartCard";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import apiBaseUrl from "../config";
+import { apiBaseUrl } from "../config";
+
 
 interface Props {
   cart: Product[];

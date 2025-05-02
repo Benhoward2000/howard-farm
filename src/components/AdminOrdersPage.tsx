@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import "./AdminPage.css";
-import apiBaseUrl from "../config";
+import { apiBaseUrl } from "../config";
 
 interface Order {
   orderId: number;
@@ -21,8 +20,8 @@ interface Order {
   zip: string;
   email: string;
   phone: string;
-  shippingMethod?: string; // ✅ NEW
-  shippingCost?: number;    // ✅ NEW
+  shippingMethod?: string;
+  shippingCost?: number;
 }
 
 const AdminOrdersPage: React.FC = () => {
@@ -32,17 +31,18 @@ const AdminOrdersPage: React.FC = () => {
   const [searchText, setSearchText] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
 
-  const fetchOrders = async () => {
-    try {
-      const res = await axios.get(`${apiBaseUrl}/api/admin/orders`, {
-        withCredentials: true,
-      });
-      setOrders(res.data);
-    } catch (err) {
-      console.error("Fetch error:", err);
-      setMessage("❌ Failed to load orders.");
-    }
-  };
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const res = await axios.get(`${apiBaseUrl}/api/admin/orders`, { withCredentials: true });
+        setOrders(res.data);
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setMessage("❌ Failed to load orders.");
+      }
+    };
+    fetchOrders();
+  }, []);
 
   const updateOrder = async (order: Order) => {
     try {
@@ -54,7 +54,6 @@ const AdminOrdersPage: React.FC = () => {
         },
         { withCredentials: true }
       );
-
       setMessage("✅ Order updated.");
       setOrders((prev) =>
         prev.map((o) => (o.orderId === order.orderId ? { ...o, ...order } : o))
@@ -65,14 +64,8 @@ const AdminOrdersPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
   const filteredOrders = orders.filter((order) => {
-    const matchesSearch = order.productName
-      .toLowerCase()
-      .includes(searchText.toLowerCase());
+    const matchesSearch = order.productName.toLowerCase().includes(searchText.toLowerCase());
     const matchesStatus = statusFilter ? order.orderStatus === statusFilter : true;
     const createdAt = new Date(order.createdAt);
     const now = new Date();
@@ -86,25 +79,25 @@ const AdminOrdersPage: React.FC = () => {
   });
 
   return (
-    <div className="admin-container max-w-5xl mx-auto px-4">
-      <h2 className="admin-title">📦 Orders</h2>
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <h2 className="text-2xl font-bold mb-4">📦 Admin Orders</h2>
 
-      {message && <p style={{ marginBottom: "1rem", color: "darkred" }}>{message}</p>}
+      {message && <p className="text-red-600 font-semibold mb-4">{message}</p>}
 
       {/* Filters */}
-      <div className="mb-4 flex flex-wrap gap-4 items-center">
+      <div className="flex flex-wrap items-end gap-4 mb-6">
         <input
           type="text"
           placeholder="Search product..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          className="border px-2 py-1 rounded"
+          className="border border-gray-300 rounded px-3 py-2 text-sm w-60"
         />
 
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="border px-2 py-1 rounded"
+          className="border border-gray-300 rounded px-3 py-2 text-sm"
         >
           <option value="">All Statuses</option>
           <option value="Pending">Pending</option>
@@ -114,102 +107,104 @@ const AdminOrdersPage: React.FC = () => {
         </select>
 
         <div className="flex gap-2">
-          <button onClick={() => setDateFilter("all")} className="filter-btn">All</button>
-          <button onClick={() => setDateFilter("7")} className="filter-btn">Last 7 Days</button>
-          <button onClick={() => setDateFilter("30")} className="filter-btn">Last 30 Days</button>
+          {["all", "7", "30"].map((range) => (
+            <button
+              key={range}
+              onClick={() => setDateFilter(range)}
+              className={`px-3 py-2 rounded text-sm ${
+                dateFilter === range
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100 hover:bg-gray-200"
+              }`}
+            >
+              {range === "all" ? "All" : `Last ${range} Days`}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Results */}
       {filteredOrders.length === 0 ? (
         <p className="text-gray-600 italic">No matching orders found.</p>
       ) : (
-        filteredOrders.map((order) => (
-          <div key={order.orderId} className="admin-product-card">
-            <p><strong>Order ID:</strong> {order.orderId}</p>
-            <p><strong>Product:</strong> {order.productName || "Unknown"}</p>
-            <p><strong>Qty:</strong> {order.quantity} @ ${order.price}</p>
-            <p><strong>Customer:</strong> {order.fullName || "N/A"}</p>
-            <p>
-              <strong>Shipping Address:</strong> {order.street || ""}, {order.city || ""}, {order.state || ""} {order.zip || ""}
-            </p>
-            {/* ✅ Show shipping method and cost */}
-            {order.shippingMethod && (
-              <p>
-                <strong>Shipping Method:</strong> {order.shippingMethod} - ${order.shippingCost?.toFixed(2) ?? "0.00"}
-              </p>
-            )}
-            <p>
-              <strong>Email:</strong> {order.email || "N/A"} | <strong>Phone:</strong> {order.phone || "N/A"}
-            </p>
-            <p>
-              <strong>Placed At:</strong>{" "}
-              {order.createdAt ? new Date(order.createdAt).toLocaleString() : "N/A"}
-            </p>
-            {order.shippedAt && (
-              <p>
-                <strong>Shipped At:</strong>{" "}
-                {order.shippedAt ? new Date(order.shippedAt).toLocaleString() : "N/A"}
-              </p>
-            )}
+        <div className="space-y-6">
+          {filteredOrders.map((order) => (
+            <div key={order.orderId} className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+              <div className="grid md:grid-cols-2 gap-3 text-sm">
+                <p><strong>Order ID:</strong> {order.orderId}</p>
+                <p><strong>Product:</strong> {order.productName}</p>
+                <p><strong>Qty:</strong> {order.quantity} × ${order.price.toFixed(2)}</p>
+                <p><strong>Customer:</strong> {order.fullName}</p>
+                <p><strong>Address:</strong> {order.street}, {order.city}, {order.state} {order.zip}</p>
+                {order.shippingMethod && (
+                  <p>
+                    <strong>Shipping:</strong> {order.shippingMethod} - ${order.shippingCost?.toFixed(2)}
+                  </p>
+                )}
+                <p><strong>Email:</strong> {order.email} | <strong>Phone:</strong> {order.phone}</p>
+                <p><strong>Placed:</strong> {new Date(order.createdAt).toLocaleString()}</p>
+                {order.shippedAt && (
+                  <p><strong>Shipped:</strong> {new Date(order.shippedAt).toLocaleString()}</p>
+                )}
+              </div>
 
-            <div className="admin-field">
-              <label>Status</label>
-              <select
-                className={`border rounded px-2 py-1 ${
-                  order.orderStatus === "Shipped"
-                    ? "text-blue-600"
-                    : order.orderStatus === "Delivered"
-                    ? "text-green-600"
-                    : order.orderStatus === "Cancelled"
-                    ? "text-red-600"
-                    : "text-black"
-                }`}
-                value={order.orderStatus}
-                onChange={(e) =>
-                  setOrders((prev) =>
-                    prev.map((o) =>
-                      o.orderId === order.orderId ? { ...o, orderStatus: e.target.value } : o
-                    )
-                  )
-                }
+              <div className="mt-4 grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Order Status</label>
+                  <select
+                    value={order.orderStatus}
+                    onChange={(e) =>
+                      setOrders((prev) =>
+                        prev.map((o) =>
+                          o.orderId === order.orderId ? { ...o, orderStatus: e.target.value } : o
+                        )
+                      )
+                    }
+                    className="border border-gray-300 rounded px-3 py-2 w-full"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Shipped">Shipped</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tracking Number</label>
+                  <input
+                    type="text"
+                    value={order.trackingNumber || ""}
+                    onChange={(e) =>
+                      setOrders((prev) =>
+                        prev.map((o) =>
+                          o.orderId === order.orderId
+                            ? { ...o, trackingNumber: e.target.value }
+                            : o
+                        )
+                      )
+                    }
+                    className="border border-gray-300 rounded px-3 py-2 w-full"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => updateOrder(order)}
+                className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
               >
-                <option value="Pending">Pending</option>
-                <option value="Shipped">Shipped</option>
-                <option value="Delivered">Delivered</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
+                💾 Save Changes
+              </button>
             </div>
-
-            <div className="admin-field">
-              <label>Tracking Number</label>
-              <input
-                type="text"
-                value={order.trackingNumber || ""}
-                onChange={(e) =>
-                  setOrders((prev) =>
-                    prev.map((o) =>
-                      o.orderId === order.orderId
-                        ? { ...o, trackingNumber: e.target.value }
-                        : o
-                    )
-                  )
-                }
-                className="border rounded px-2 py-1"
-              />
-            </div>
-
-            <button className="save-btn" onClick={() => updateOrder(order)}>
-              💾 Save Changes
-            </button>
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>
   );
 };
 
 export default AdminOrdersPage;
+
+
+
 
 
 

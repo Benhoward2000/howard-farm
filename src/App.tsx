@@ -1,4 +1,3 @@
-import './App.css';
 import { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
 import AboutPage from './components/AboutPage';
@@ -12,9 +11,11 @@ import AccountPage from './components/AccountPage';
 import Navbar from './components/Navbar';
 import AdminOrdersPage from './components/AdminOrdersPage';
 import OrderConfirmation from './components/OrderConfirmation';
-import apiBaseUrl from "./config";
-import { LoadScript } from "@react-google-maps/api";
-
+import { apiBaseUrl } from './config';
+import { LoadScript } from '@react-google-maps/api';
+import { HelmetProvider } from 'react-helmet-async';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const App = () => {
   const [currentPage, setPage] = useState<string>('Home');
@@ -25,7 +26,7 @@ const App = () => {
   const fetchUser = async () => {
     try {
       const res = await fetch(`${apiBaseUrl}/api/auth/me`, {
-        credentials: "include",
+        credentials: 'include',
       });
 
       if (!res.ok) {
@@ -34,13 +35,9 @@ const App = () => {
       }
 
       const data = await res.json();
-      if (data?.email || data?.username || data?.id) {
-        setUser(data);
-      } else {
-        setUser(null);
-      }
+      setUser(data?.email || data?.username || data?.id ? data : null);
     } catch (err) {
-      console.error("Error fetching current user:", err);
+      console.error('Error fetching current user:', err);
       setUser(null);
     }
   };
@@ -75,18 +72,18 @@ const App = () => {
         return user?.isAdmin ? (
           <AdminPage />
         ) : (
-          <div style={{ padding: "2rem", textAlign: "center" }}>
-            <h2>🚫 Access Denied</h2>
-            <p>You must be an admin to view this page.</p>
+          <div className="p-8 text-center">
+            <h2 className="text-xl font-semibold text-red-600">🚫 Access Denied</h2>
+            <p className="text-gray-600">You must be an admin to view this page.</p>
           </div>
         );
       case 'AdminOrders':
         return user?.isAdmin ? (
           <AdminOrdersPage />
         ) : (
-          <div style={{ padding: "2rem", textAlign: "center" }}>
-            <h2>🚫 Access Denied</h2>
-            <p>You must be an admin to view this page.</p>
+          <div className="p-8 text-center">
+            <h2 className="text-xl font-semibold text-red-600">🚫 Access Denied</h2>
+            <p className="text-gray-600">You must be an admin to view this page.</p>
           </div>
         );
       case 'Login':
@@ -101,21 +98,37 @@ const App = () => {
   };
 
   return (
-    <LoadScript
-      googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY as string}
-      libraries={["places"]}
-    >
-      <div className="App">
-        <header className="app-header">
-          <Navbar setPage={setPage} user={user} setUser={setUser} />
-        </header>
-        <main>{renderPage()}</main>
-      </div>
-    </LoadScript>
+    <HelmetProvider>
+      <LoadScript
+        googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY as string}
+        libraries={['places']}
+      >
+        <div className="min-h-screen bg-white flex flex-col">
+          <header className="shadow-sm">
+            <Navbar setPage={setPage} user={user} setUser={setUser} />
+          </header>
+
+          <main className="flex-grow">{renderPage()}</main>
+
+          <ToastContainer
+            position="bottom-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
+        </div>
+      </LoadScript>
+    </HelmetProvider>
   );
 };
 
 export default App;
+
+
 
 
 

@@ -1,5 +1,7 @@
 import { useState } from "react";
-import apiBaseUrl from "../config";
+import { apiBaseUrl } from "../config";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFacebookF } from "@fortawesome/free-brands-svg-icons";
 import { Menu, X } from "lucide-react";
 
 interface NavbarProps {
@@ -60,7 +62,7 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-4 justify-end flex-1">
+        <div className="flex flex-wrap gap-4 justify-end flex-1 items-center">
           {navItems.map((item) => (
             <button
               key={item.label}
@@ -78,6 +80,16 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
               Logout
             </button>
           )}
+
+          {/* Facebook Icon */}
+          <a
+            href="https://www.facebook.com/profile.php?id=100095547510732"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full w-10 h-10 flex items-center justify-center border border-[#4a3a28] text-[#4a3a28] hover:bg-[#4a3a28] hover:text-white transition"
+          >
+            <FontAwesomeIcon icon={faFacebookF} />
+          </a>
         </div>
       </div>
 
@@ -135,6 +147,16 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
               Logout
             </button>
           )}
+
+          {/* Facebook Icon (Mobile) */}
+          <a
+            href="https://www.facebook.com/profile.php?id=100095547510732"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-11/12 max-w-xs py-2 flex items-center justify-center rounded-full border border-[#4a3a28] text-[#4a3a28] hover:bg-[#4a3a28] hover:text-white transition"
+          >
+            <FontAwesomeIcon icon={faFacebookF} className="text-lg" />
+          </a>
         </div>
       )}
     </div>
@@ -142,6 +164,7 @@ const Navbar = ({ setPage, user, setUser }: NavbarProps) => {
 };
 
 export default Navbar;
+
 
 
 
