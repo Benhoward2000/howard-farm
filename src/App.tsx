@@ -11,10 +11,14 @@ import AccountPage from './components/AccountPage';
 import Navbar from './components/Navbar';
 import AdminOrdersPage from './components/AdminOrdersPage';
 import OrderConfirmation from './components/OrderConfirmation';
+import RequestPasswordReset from './components/RequestPasswordReset';
+import ResetPassword from './components/ResetPassword';
+
 import { apiBaseUrl } from './config';
 import { LoadScript } from '@react-google-maps/api';
 import { HelmetProvider } from 'react-helmet-async';
 import { ToastContainer } from 'react-toastify';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import 'react-toastify/dist/ReactToastify.css';
 
 const App = () => {
@@ -90,6 +94,8 @@ const App = () => {
         return <LoginPage setUser={setUser} setPage={setPage} />;
       case 'CreateAccount':
         return <CreateAccount setPage={setPage} />;
+      case 'RequestPasswordReset':
+        return <RequestPasswordReset setPage={setPage} />;
       case 'Account':
         return <AccountPage user={user} setPage={setPage} refreshUser={fetchUser} />;
       default:
@@ -97,36 +103,48 @@ const App = () => {
     }
   };
 
+  // 👇 Wrapper to pass setPage to ResetPassword
+ const ResetPasswordWrapper = () => <ResetPassword />;
+
+
   return (
     <HelmetProvider>
       <LoadScript
         googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY as string}
         libraries={['places']}
       >
-        <div className="min-h-screen bg-white flex flex-col">
-          <header className="shadow-sm">
-            <Navbar setPage={setPage} user={user} setUser={setUser} />
-          </header>
+        <Router>
+          <div className="min-h-screen bg-white flex flex-col">
+            <header className="shadow-sm">
+              <Navbar setPage={setPage} user={user} setUser={setUser} />
+            </header>
 
-          <main className="flex-grow">{renderPage()}</main>
+            <main className="flex-grow">
+              <Routes>
+                <Route path="/reset-password" element={<ResetPasswordWrapper />} />
+                <Route path="*" element={renderPage()} />
+              </Routes>
+            </main>
 
-          <ToastContainer
-            position="bottom-right"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-          />
-        </div>
+            <ToastContainer
+              position="bottom-right"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop={false}
+              closeOnClick
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+            />
+          </div>
+        </Router>
       </LoadScript>
     </HelmetProvider>
   );
 };
 
 export default App;
+
 
 
 

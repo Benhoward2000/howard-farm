@@ -7,7 +7,7 @@ const session = require("express-session");
 const nodemailer = require("nodemailer");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { sql, poolPromise } = require("./db");
-const authRoutes = require("./Auth");
+const authRoutes = require("./Auth.js");
 const router = express.Router();
 const fetch = require("node-fetch");
 const app = express();
@@ -264,8 +264,6 @@ const shipmentData = JSON.parse(shipmentText);
     res.status(500).json({ error: "Failed to get shipping rates" });
   }
 });
-
-module.exports = router;
 
 
 // Stripe PaymentIntent

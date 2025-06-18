@@ -85,6 +85,15 @@ const LoginPage: React.FC<Props> = ({ setUser, setPage }) => {
               placeholder="Enter your password"
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <div className="text-right mt-1">
+              <button
+                type="button"
+                onClick={() => setPage("RequestPasswordReset")}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Forgot your password?
+              </button>
+            </div>
           </div>
 
           <button
@@ -112,6 +121,7 @@ const LoginPage: React.FC<Props> = ({ setUser, setPage }) => {
 };
 
 export default LoginPage;
+
 
 
 

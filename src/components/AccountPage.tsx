@@ -24,6 +24,7 @@ const AccountPage: React.FC<Props> = ({ user, setPage, refreshUser }) => {
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
+    phone: user?.phone || "",
     street: user?.street || "",
     city: user?.city || "",
     state: user?.state || "",
@@ -235,6 +236,16 @@ useEffect(() => {
             className="border rounded p-2 bg-gray-100 cursor-not-allowed"
           />
         </div>
+        <div className="flex flex-col">
+  <label className="font-semibold mb-1">Phone</label>
+  <input
+    type="tel"
+    name="phone"
+    value={formData.phone}
+    onChange={handleChange}
+    className="border rounded p-2"
+  />
+</div>
 
         <div className="flex flex-col md:col-span-2 relative">
           <label className="font-semibold mb-1">Street</label>

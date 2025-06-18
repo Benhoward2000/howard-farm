@@ -8,6 +8,7 @@ interface Props {
 const CreateAccount: React.FC<Props> = ({ setPage }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ const CreateAccount: React.FC<Props> = ({ setPage }) => {
       const res = await fetch(`${apiBaseUrl}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, phone, password }),
       });
 
       const data = await res.json();
@@ -72,7 +73,6 @@ const CreateAccount: React.FC<Props> = ({ setPage }) => {
 
   return (
     <div className="flex items-start justify-center min-h-screen bg-white px-4 pt-8 pb-12 relative">
-      {/* Toast */}
       {toast && (
         <div
           className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow-lg text-white transition-all duration-300 ${
@@ -107,6 +107,18 @@ const CreateAccount: React.FC<Props> = ({ setPage }) => {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="you@example.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              placeholder="555-555-5555"
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -160,5 +172,6 @@ const CreateAccount: React.FC<Props> = ({ setPage }) => {
 };
 
 export default CreateAccount;
+
 
 
