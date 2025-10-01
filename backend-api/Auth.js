@@ -35,7 +35,8 @@ router.post("/login", async (req, res) => {
       city: user.City || "",
       state: user.State || "",
       zip: user.Zip || "",
-      marketingOptIn: !!user.MarketingOptIn
+      marketingOptIn: !!user.MarketingOptIn,
+      smsAlertOptIn: !!user.SmsAlertOptIn 
     };
 
     res.json({ message: "Login successful", user: req.session.user });
@@ -157,7 +158,8 @@ router.get("/me", async (req, res) => {
       city: user.City || "",
       state: user.State || "",
       zip: user.Zip || "",
-      marketingOptIn: !!user.MarketingOptIn
+      marketingOptIn: !!user.MarketingOptIn,
+      smsAlertOptIn: !!user.SmsAlertOptIn
     });
   } catch (err) {
     console.error("Get /me error:", err.message);
@@ -165,6 +167,34 @@ router.get("/me", async (req, res) => {
   }
 });
 
+// ADMIN: toggle SMS order-alert opt-in for the CURRENT admin user
+router.put("/account/alerts/optin", async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.session.user.isAdmin) return res.status(403).json({ message: "Admins only" });
+
+  const { smsAlertOptIn } = req.body;
+  const value = smsAlertOptIn === true || smsAlertOptIn === 1 ? 1 : 0;
+
+  try {
+    const pool = await poolPromise;
+    await pool.request()
+      .input("UserId", sql.Int, req.session.user.id)
+      .input("OptIn", sql.Bit, value)
+      .query(`
+        UPDATE Users
+        SET SmsAlertOptIn = @OptIn
+        WHERE UserId = @UserId AND IsAdmin = 1
+      `);
+
+    // keep session in sync
+    req.session.user.smsAlertOptIn = !!value;
+
+    res.json({ message: "SMS alert opt-in updated", smsAlertOptIn: !!value });
+  } catch (err) {
+    console.error("Admin opt-in update error:", err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // CHANGE PASSWORD
 router.post("/account/changepassword", async (req, res) => {
@@ -204,15 +234,21 @@ router.post("/account/changepassword", async (req, res) => {
   }
 });
 
-// UPDATE ACCOUNT INFO
+// UPDATE ACCOUNT INFO (supports admin-only SmsAlertOptIn)
 router.post("/account/update", async (req, res) => {
   if (!req.session.user) return res.status(401).json({ message: "Unauthorized" });
 
-  const { name, phone, street, city, state, zip, marketingOptIn } = req.body;
+  // include smsAlertOptIn in the payload
+  const { name, phone, street, city, state, zip, marketingOptIn, smsAlertOptIn } = req.body;
 
   try {
     const pool = await poolPromise;
-    await pool
+
+    const canSetSms =
+      !!req.session.user.isAdmin &&
+      (smsAlertOptIn === true || smsAlertOptIn === false || smsAlertOptIn === 1 || smsAlertOptIn === 0);
+
+    const request = pool
       .request()
       .input("UserId", sql.Int, req.session.user.id)
       .input("Name", sql.NVarChar, name)
@@ -221,22 +257,40 @@ router.post("/account/update", async (req, res) => {
       .input("City", sql.NVarChar, city)
       .input("State", sql.NVarChar, state)
       .input("Zip", sql.NVarChar, zip)
-      .input("MarketingOptIn", sql.Bit, marketingOptIn ? 1 : 0)
-      .query(`
+      .input("MarketingOptIn", sql.Bit, marketingOptIn ? 1 : 0);
+
+    let sqlText = `
+      UPDATE Users
+      SET Name = @Name, Phone = @Phone, Street = @Street, City = @City,
+          State = @State, Zip = @Zip, MarketingOptIn = @MarketingOptIn
+      WHERE UserId = @UserId
+    `;
+
+    if (canSetSms) {
+      request.input("SmsAlertOptIn", sql.Bit, smsAlertOptIn ? 1 : 0);
+      sqlText = `
         UPDATE Users
         SET Name = @Name, Phone = @Phone, Street = @Street, City = @City,
-            State = @State, Zip = @Zip, MarketingOptIn = @MarketingOptIn
+            State = @State, Zip = @Zip, MarketingOptIn = @MarketingOptIn,
+            SmsAlertOptIn = @SmsAlertOptIn
         WHERE UserId = @UserId
-      `);
+      `;
+    }
 
+    await request.query(sqlText);
+
+    // keep session in sync with what you show in the UI
     req.session.user.name = name;
     req.session.user.phone = phone;
+    if (canSetSms) req.session.user.smsAlertOptIn = !!smsAlertOptIn;
+
     res.json({ message: "Account updated successfully" });
   } catch (err) {
     console.error("Account update error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 
 module.exports = router;
