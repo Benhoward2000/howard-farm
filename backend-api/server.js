@@ -9,7 +9,6 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { sql, poolPromise } = require("./db");
 const authRoutes = require("./Auth.js");
 const router = express.Router();
-const fetch = require("node-fetch");
 const app = express();
 const EASYPOST_API_KEY = process.env.EASYPOST_API_KEY; // load from .env
 const PORT = process.env.PORT || 3001;
