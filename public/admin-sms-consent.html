@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Howard's Farm – Admin SMS Consent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="index,follow" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 2rem; color: #111; line-height: 1.6; }
+    .card { max-width: 820px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 2rem; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    h1 { font-size: 1.75rem; margin: 0 0 0.75rem; }
+    h2 { font-size: 1.125rem; margin: 1.25rem 0 0.5rem; }
+    .muted { color: #555; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .box { background: #f9fafb; border: 1px solid #eef0f3; padding: 0.75rem 1rem; border-radius: 8px; }
+    .small { font-size: 0.95rem; }
+    .hr { height: 1px; background: #eef0f3; margin: 1.25rem 0; }
+    .foot { color: #666; font-size: 0.9rem; }
+  </style>
+  <link rel="canonical" href="https://howardsfarm.org/admin-sms-consent.html" />
+</head>
+<body>
+  <main class="card" role="main" aria-label="Admin SMS Consent Document">
+    <header>
+      <h1>Howard's Farm – Admin SMS Consent</h1>
+      <p class="muted">Howard's Farm Yankton LLC (<span class="mono">howardsfarm.org</span>)</p>
+    </header>
+
+    <div class="hr"></div>
+
+    <section>
+      <h2>Purpose & Use Case</h2>
+      <p>
+        Howard's Farm uses a Twilio toll-free number to send <strong>internal, non-marketing</strong> SMS messages that notify the
+        business owner when a new customer order is placed on the website. These messages are strictly operational.
+      </p>
+      <div class="box small">
+        <div><strong>Sender (Toll-Free) Number:</strong> <span class="mono">+1-855-921-5406</span></div>
+        <div><strong>Recipient (Admin) Number:</strong> <span class="mono">+1-720-755-4439</span> <!-- replace with your real cell if different --></div>
+        <div><strong>Message Type:</strong> Order notifications only (no promotions/marketing)</div>
+        <div><strong>Expected Frequency:</strong> 0–10 msgs/day (volume depends on orders)</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Opt-In Workflow (Admin Only)</h2>
+      <p>
+        This program is <strong>not consumer-facing</strong>. The only participant is the business owner/administrator.
+        The admin number is explicitly configured in the site’s back-office settings (or server environment) for
+        “Order SMS Alerts.” By configuring the number, the owner provides explicit consent to receive SMS messages for this purpose.
+      </p>
+      <div class="box small">
+        <strong>Opt-In Method:</strong> Owner-provided phone number configured in the Howard’s Farm admin settings for “Order SMS Alerts.”
+        Participation is limited to the owner; no public sign-up exists.
+      </div>
+    </section>
+
+    <section>
+      <h2>Consent Statement (Owner)</h2>
+      <p>
+        I, <strong>Ben Howard</strong>, owner/administrator of <strong>Howard's Farm Yankton LLC</strong>, consent to receive SMS messages
+        at <span class="mono">+1-503-555-1234</span> from our Twilio toll-free number <span class="mono">+1-855-921-5406</span> solely for internal order
+        notifications. I understand these are non-marketing, operational alerts related to transactions on howardsfarm.org.
+      </p>
+      <div class="box small">
+        <div><strong>Date of Consent:</strong> October 1, 2025</div>
+        <div><strong>Authorized By:</strong> Ben Howard (Owner)</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Sample Message</h2>
+      <div class="box mono small" aria-label="Sample SMS message">
+        🛒 New order #12345 — 2× Peach Habanero Jam — Total $24.98. Ship: USPS Ground Advantage ($5.00).<br />
+        Howard’s Farm (howardsfarm.org)
+      </div>
+    </section>
+
+    <section>
+      <h2>HELP/STOP & Fees</h2>
+      <p class="small">
+        Reply <strong>HELP</strong> for help. Reply <strong>STOP</strong> to stop messages to the admin number at any time. Message
+        and data rates may apply.
+      </p>
+    </section>
+
+    <section>
+      <h2>Support & Contact</h2>
+      <div class="box small">
+        <div><strong>Business:</strong> Howard's Farm Yankton LLC</div>
+        <div><strong>Website:</strong> <a href="https://howardsfarm.org" target="_blank" rel="noopener">howardsfarm.org</a></div>
+        <div><strong>Email:</strong> <a href="mailto:benhoward2000@gmail.com">benhoward2000@gmail.com</a></div>
+        <div><strong>Privacy Policy:</strong> <a href="https://howardsfarm.org/privacy" target="_blank" rel="noopener">howardsfarm.org/privacy</a></div>
+        <div><strong>Terms:</strong> <a href="https://howardsfarm.org/terms" target="_blank" rel="noopener">howardsfarm.org/terms</a></div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <div class="hr"></div>
+      <p>
+        This page documents the opt-in and messaging details for Twilio Toll-Free Verification and is intentionally public
+        for carrier review. No consumer enrollment is offered or implied.
+      </p>
+      <p>Last updated: October 1, 2025</p>
+    </footer>
+  </main>
+</body>
+</html>
