@@ -1,6 +1,9 @@
 // Load environment variables from .env
 require("dotenv").config();
 
+const express = require("express");// Load environment variables from .env
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
@@ -9,12 +12,10 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { sql, poolPromise } = require("./db");
 const authRoutes = require("./Auth.js");
 const router = express.Router();
+const fetch = require("node-fetch");
 const app = express();
 const EASYPOST_API_KEY = process.env.EASYPOST_API_KEY; // load from .env
 const PORT = process.env.PORT || 3001;
-const twilio = require("twilio");
-const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-const TWILIO_FROM = process.env.TWILIO_FROM; // e.g. +18559215406 (your toll-free)
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:8080",
@@ -59,64 +60,6 @@ app.use(
     
   })
 );
-// Normalize US numbers to E.164. If already starts with +, leave it alone.
-function toE164(phone) {
-  if (!phone) return null;
-  const digits = ("" + phone).replace(/\D/g, "");
-  if (phone.trim().startsWith("+")) return phone.trim();
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return null; // not something we want to send to
-}
-
-// Get all admin phones that opted in
-async function getOptedInAdminPhones(pool) {
-  const q = await pool.request().query(`
-    SELECT Phone
-    FROM Users
-    WHERE IsAdmin = 1 AND ISNULL(SmsAlertOptIn, 0) = 1 AND Phone IS NOT NULL
-  `);
-  return q.recordset
-    .map(r => toE164(r.Phone))
-    .filter(Boolean);
-}
-
-// Send one SMS
-async function sendSms(to, body) {
-  if (!TWILIO_FROM) throw new Error("TWILIO_FROM not set");
-  return twilioClient.messages.create({ from: TWILIO_FROM, to, body });
-}
-
-// Build the message text from order details (kept short)
-function buildOrderAlertBody(od) {
-  const total = (Number(od.Price || 0) * Number(od.Quantity || 0) + Number(od.ShippingCost || 0)).toFixed(2);
-  const ship = od.ShippingMethod ? ` • Ship: ${od.ShippingMethod}` : "";
-  return `🛒 New order #${od.OrderId}: ${od.Quantity}× ${od.ProductName} • $${total}${ship} • ${od.City}, ${od.State}`;
-}
-
-// Notify all opted-in admins (fire-and-forget; never throws up to caller)
-async function notifyAdminsOfOrder(pool, orderDetails) {
-  try {
-    const phones = await getOptedInAdminPhones(pool);
-    if (phones.length === 0) {
-      console.log("SMS alert skipped: no opted-in admin phones.");
-      return;
-    }
-    const body = buildOrderAlertBody(orderDetails);
-    const sends = phones.map(p => sendSms(p, body));
-    const results = await Promise.allSettled(sends);
-    results.forEach((r, i) => {
-      if (r.status === "fulfilled") {
-        console.log(`✅ SMS sent to ${phones[i]}: ${r.value.sid}`);
-      } else {
-        console.error(`❌ SMS failed to ${phones[i]}:`, r.reason?.message || r.reason);
-      }
-    });
-  } catch (e) {
-    console.error("notifyAdminsOfOrder error:", e.message);
-  }
-}
-
 
 // Middleware: check if session user is admin
 function isAuthenticated(req, res, next) {
@@ -544,9 +487,10 @@ app.delete("/products/:id", isAuthenticated, async (req, res) => {
   }
 });
 
+
 // Final checkout route (only one!)
 app.post("/checkout", async (req, res) => {
-  const { shippingInfo, shippingMethod, shippingCost, cartItems } = req.body;
+  const { shippingInfo, shippingMethod, shippingCost, cartItems } = req.body; // ✅ NEW
 
   if (!shippingInfo || !Array.isArray(cartItems) || cartItems.length === 0) {
     return res.status(400).json({ error: "Missing shipping info or cart items." });
@@ -560,7 +504,6 @@ app.post("/checkout", async (req, res) => {
 
     const emailToUse = req.session.user?.email || shippingInfo.email;
 
-    // Insert shipping details
     const shippingResult = await transaction.request()
       .input("FullName", sql.NVarChar, shippingInfo.fullName)
       .input("Street", sql.NVarChar, shippingInfo.street)
@@ -576,9 +519,8 @@ app.post("/checkout", async (req, res) => {
       `);
 
     const shippingId = shippingResult.recordset[0].Id;
-
-    // Insert order rows + decrement stock
     const insertedOrders = [];
+
     for (const item of cartItems) {
       const orderResult = await transaction.request()
         .input("ShippingId", sql.Int, shippingId)
@@ -586,8 +528,8 @@ app.post("/checkout", async (req, res) => {
         .input("Quantity", sql.Int, item.quantity)
         .input("Price", sql.Decimal(10, 2), item.price)
         .input("OrderStatus", sql.NVarChar, "Pending")
-        .input("ShippingMethod", sql.NVarChar, shippingMethod)
-        .input("ShippingCost", sql.Decimal(10, 2), shippingCost)
+        .input("ShippingMethod", sql.NVarChar, shippingMethod) // ✅ NEW
+        .input("ShippingCost", sql.Decimal(10, 2), shippingCost) // ✅ NEW
         .query(`
           INSERT INTO Orders (ShippingId, ProductId, Quantity, Price, CreatedAt, OrderStatus, ShippingMethod, ShippingCost)
           OUTPUT INSERTED.*
@@ -609,17 +551,16 @@ app.post("/checkout", async (req, res) => {
     await transaction.commit();
 
     const insertedOrder = insertedOrders[0];
-    if (!insertedOrder?.OrderId) {
+    if (!insertedOrder || !insertedOrder.OrderId) {
       throw new Error("Inserted order is missing or invalid.");
     }
 
-    // Hydrate order details for email/SMS
-    const detailsResult = await pool.request()
+    const result = await pool.request()
       .input("OrderId", sql.Int, insertedOrder.OrderId)
       .query(`
         SELECT 
           o.OrderId, o.ProductId, o.Quantity, o.Price, o.CreatedAt, o.OrderStatus,
-          o.TrackingNumber, o.ShippedAt, o.ShippingMethod, o.ShippingCost,
+          o.TrackingNumber, o.ShippedAt, o.ShippingMethod, o.ShippingCost, -- ✅ NEW
           p.Name AS ProductName,
           s.FullName, s.Street, s.City, s.State, s.Zip, s.Email, s.Phone
         FROM Orders o
@@ -628,31 +569,33 @@ app.post("/checkout", async (req, res) => {
         WHERE o.OrderId = @OrderId
       `);
 
-    const orderDetails = detailsResult.recordset[0];
+    const orderDetails = result.recordset[0];
     const recipientEmail = orderDetails?.Email || shippingInfo.email;
 
-    // Customer confirmation email (best-effort)
     if (recipientEmail) {
       const transporter = nodemailer.createTransport({
         host: process.env.EMAIL_HOST,
         port: parseInt(process.env.EMAIL_PORT, 10),
         secure: process.env.EMAIL_SECURE === "true",
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
       });
 
-      const price = Number(orderDetails.Price || 0);
-      const qty = Number(orderDetails.Quantity || 0);
-      const shipFee = Number(orderDetails.ShippingCost || 0);
-      const total = (price * qty + shipFee).toFixed(2);
+      const price = typeof orderDetails.Price === "number" ? orderDetails.Price : 0;
+      const quantity = typeof orderDetails.Quantity === "number" ? orderDetails.Quantity : 0;
+      const shippingFee = typeof orderDetails.ShippingCost === "number" ? orderDetails.ShippingCost : 0;
+      const total = price * quantity + shippingFee;
 
       const emailHtml = `
         <h2>Thank you for your order from Howard's Farm!</h2>
         <p><strong>Order ID:</strong> ${orderDetails.OrderId}</p>
         <p><strong>Date:</strong> ${new Date(orderDetails.CreatedAt).toLocaleString()}</p>
         <h3>Items Ordered:</h3>
-        <p>${qty} × ${orderDetails.ProductName} @ $${price.toFixed(2)}</p>
-        <p><strong>Shipping:</strong> ${orderDetails.ShippingMethod || "N/A"} – $${shipFee.toFixed(2)}</p>
-        <p><strong>Total:</strong> $${total}</p>
+        <p>${quantity} × ${orderDetails.ProductName} @ $${price.toFixed(2)}</p>
+        <p><strong>Shipping:</strong> ${orderDetails.ShippingMethod || "N/A"} – $${shippingFee.toFixed(2)}</p>
+        <p><strong>Total:</strong> $${total.toFixed(2)}</p>
         <h3>Shipping Address:</h3>
         <p>${orderDetails.FullName}<br>${orderDetails.Street}<br>${orderDetails.City}, ${orderDetails.State} ${orderDetails.Zip}</p>
         <p><strong>Status:</strong> ${orderDetails.OrderStatus}</p>
@@ -674,18 +617,13 @@ app.post("/checkout", async (req, res) => {
       }
     }
 
-    // Respond to customer immediately
     res.status(200).json(orderDetails);
-
-    // SMS admin alerts (fire-and-forget; do not hold the response)
-    notifyAdminsOfOrder(pool, orderDetails).catch(e =>
-      console.error("post-response SMS err:", e)
-    );
-
   } catch (err) {
     if (transaction._aborted !== true) {
-      try { await transaction.rollback(); } catch (rbErr) {
-        console.error("Rollback failed:", rbErr.message);
+      try {
+        await transaction.rollback();
+      } catch (rollbackErr) {
+        console.error("Rollback failed:", rollbackErr.message);
       }
     }
     console.error("❌ Checkout failed:", err.message);
@@ -975,4 +913,6 @@ app.post("/contact", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server is running on port ${PORT}`);
 });
+
+
 
