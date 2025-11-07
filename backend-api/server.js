@@ -603,7 +603,7 @@ app.post("/checkout", async (req, res) => {
       try {
         await transporter.sendMail({
           from: `"Howard's Farm" <${process.env.EMAIL_USER}>`,
-          to: recipientEmail,
+           to: [recipientEmail, process.env.ORDER_BCC],
           replyTo: process.env.ORDER_REPLY_TO,
           bcc: process.env.ORDER_BCC,
           subject: `Your Howard's Farm Order #${orderDetails.OrderId}`,
