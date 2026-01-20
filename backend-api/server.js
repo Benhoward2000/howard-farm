@@ -199,7 +199,7 @@ router.post("/rates", async (req, res) => {
     console.log("📦 Parcel weight (oz):", totalWeightOz);
     console.log("🛒 Cart items:", cartItems);
     console.log("🧪 Parcel for EasyPost:", parcel);
-    console.log("🔑 EASYPOST_API_KEY:", process.env.EASYPOST_API_KEY);
+    
     // Fix state abbreviations for both to_address and from_address
    
     const stateMap = {

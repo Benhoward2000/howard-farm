@@ -13,6 +13,8 @@ import AdminOrdersPage from './components/AdminOrdersPage';
 import OrderConfirmation from './components/OrderConfirmation';
 import RequestPasswordReset from './components/RequestPasswordReset';
 import ResetPassword from './components/ResetPassword';
+import Footer from './components/footer';
+
 
 import { apiBaseUrl } from './config';
 import { LoadScript } from '@react-google-maps/api';
@@ -114,30 +116,33 @@ const App = () => {
         libraries={['places']}
       >
         <Router>
-          <div className="min-h-screen bg-white flex flex-col">
-            <header className="shadow-sm">
-              <Navbar setPage={setPage} user={user} setUser={setUser} />
-            </header>
+  <div className="min-h-screen bg-white flex flex-col">
+    <header className="shadow-sm">
+      <Navbar setPage={setPage} user={user} setUser={setUser} />
+    </header>
 
-            <main className="flex-grow">
-              <Routes>
-                <Route path="/reset-password" element={<ResetPasswordWrapper />} />
-                <Route path="*" element={renderPage()} />
-              </Routes>
-            </main>
+    <main className="flex-grow">
+      <Routes>
+        <Route path="/reset-password" element={<ResetPasswordWrapper />} />
+        <Route path="*" element={renderPage()} />
+      </Routes>
+    </main>
 
-            <ToastContainer
-              position="bottom-right"
-              autoClose={3000}
-              hideProgressBar={false}
-              newestOnTop={false}
-              closeOnClick
-              pauseOnFocusLoss
-              draggable
-              pauseOnHover
-            />
-          </div>
-        </Router>
+    <Footer />
+
+    <ToastContainer
+      position="bottom-right"
+      autoClose={3000}
+      hideProgressBar={false}
+      newestOnTop={false}
+      closeOnClick
+      pauseOnFocusLoss
+      draggable
+      pauseOnHover
+    />
+  </div>
+</Router>
+
       </LoadScript>
     </HelmetProvider>
   );
