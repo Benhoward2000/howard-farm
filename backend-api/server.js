@@ -149,7 +149,7 @@ if (wasValidated || treatAsValid) {
 });
 
 
-// 📦 EasyPost Calculate Shipping Rates
+// 📦 EasyPost Calculate Shipping Rates - UPDATED FOR STANDARD JARS
 router.post("/rates", async (req, res) => {
   const { street, city, state, zip, cartItems } = req.body;
 
@@ -187,39 +187,71 @@ router.post("/rates", async (req, res) => {
       return sum + weightOz * qty;
     }, 0);
 
-    // Calculate parcel dimensions based on actual items
-    // For multiple items, we'll use the largest dimensions and stack/combine appropriately
-    let maxLength = 0;
-    let maxWidth = 0;
-    let totalHeight = 0;
+    // Calculate box dimensions - IMPROVED FOR JARS
+    const totalItems = cartItems.reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);
+    
+    let boxLength, boxWidth, boxHeight;
 
-    cartItems.forEach(item => {
-      const length = parseFloat(item.length) || 6;
-      const width = parseFloat(item.width) || 6;
-      const height = parseFloat(item.height) || 6;
-      const qty = parseInt(item.quantity) || 1;
+    // Standard jar dimensions (approximate)
+    const jarDiameter = 3.5; // inches (slightly larger to account for packing)
+    const jarHeight = 5.5;   // inches (pint jar + padding)
 
-      // Track the largest length and width (assuming items are packed side by side or nested)
-      maxLength = Math.max(maxLength, length);
-      maxWidth = Math.max(maxWidth, width);
+    if (totalItems === 1) {
+      // Single jar - minimal box
+      boxLength = 4;
+      boxWidth = 4;
+      boxHeight = 6;
+    } else if (totalItems === 2) {
+      // 2 jars - side by side
+      boxLength = 8;
+      boxWidth = 4;
+      boxHeight = 6;
+    } else if (totalItems === 3) {
+      // 3 jars - THIS IS THE KEY FIX
+      // USPS Small Flat Rate Box or similar: 8.625 x 5.375 x 1.625
+      // But 3 pint jars need more space, likely 2 rows
+      boxLength = 9;
+      boxWidth = 7;
+      boxHeight = 6;
+    } else if (totalItems === 4) {
+      // 4 jars - 2x2 arrangement
+      boxLength = 8;
+      boxWidth = 8;
+      boxHeight = 6;
+    } else if (totalItems <= 6) {
+      // 5-6 jars - 2x3 arrangement
+      boxLength = 11;
+      boxWidth = 8;
+      boxHeight = 6;
+    } else {
+      // 7+ jars - larger box, possibly multiple layers
+      const itemsPerLayer = Math.ceil(Math.sqrt(totalItems));
+      const layers = Math.ceil(totalItems / (itemsPerLayer * itemsPerLayer));
       
-      // Stack heights (assuming items are stacked vertically when multiples)
-      totalHeight += height * qty;
-    });
+      boxLength = itemsPerLayer * jarDiameter + 2;
+      boxWidth = itemsPerLayer * jarDiameter + 2;
+      boxHeight = layers * jarHeight + 2;
+    }
 
-    // Use calculated dimensions, with minimums for very small items
+    // Add packing material weight (bubble wrap, paper, etc.)
+    const packingWeightOz = totalItems * 2; // ~2 oz per jar for packing
+    const totalShippingWeight = totalWeightOz + packingWeightOz;
+
     const parcel = {
-      weight: parseFloat(totalWeightOz.toFixed(2)),
-      length: Math.max(maxLength, 3), // EasyPost minimum is typically 3 inches
-      width: Math.max(maxWidth, 3),
-      height: Math.max(totalHeight, 3),
+      weight: parseFloat(totalShippingWeight.toFixed(2)),
+      length: Math.ceil(boxLength),
+      width: Math.ceil(boxWidth),
+      height: Math.ceil(boxHeight),
     };
     
-    console.log("📦 Total parcel weight (oz):", totalWeightOz);
-    console.log("📦 Calculated dimensions:", parcel);
+    console.log("📦 Total items:", totalItems);
+    console.log("📦 Product weight (oz):", totalWeightOz);
+    console.log("📦 Packing weight (oz):", packingWeightOz);
+    console.log("📦 Total shipping weight (oz):", totalShippingWeight);
+    console.log("📦 Box dimensions (in):", parcel);
     console.log("🛒 Cart items:", cartItems);
     
-    // Fix state abbreviations for both to_address and from_address
+    // Fix state abbreviations
     const stateMap = {
       "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
       "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
@@ -233,7 +265,6 @@ router.post("/rates", async (req, res) => {
       "Virginia": "VA", "Washington": "WA", "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
     };
 
-    // Replace state names with abbreviations if needed
     if (toAddress?.state) {
       toAddress.state = stateMap[toAddress.state] || toAddress.state;
     }
