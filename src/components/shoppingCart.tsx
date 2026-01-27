@@ -137,6 +137,7 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
       }
     };
     fetchRates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shipping.street, shipping.city, shipping.state, shipping.zip, cart.length, cartTotalWeight, requiresLocalOnly]);
 
   const handlePlaceSelect = (placeId: string) => {
@@ -398,4 +399,5 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
 };
 
 export default ShoppingCart;
+
 
