@@ -75,11 +75,11 @@ router.post("/register", async (req, res) => {
       .input("Name", sql.NVarChar, name)
       .input("MarketingOptIn", sql.Bit, marketingOptIn ? 1 : 0)
       .input("isVerified", sql.Bit, 0)
-      .input("verificationCode", sql.NVarChar, verificationCode)
+      .input("verificationToken", sql.NVarChar, verificationCode) // ✅ FIXED: was verificationCode
       .input("Phone", sql.NVarChar, phone || "")
       .query(`
-        INSERT INTO Users (Email, PasswordHash, Name, CreatedAt, MarketingOptIn, isVerified, verificationCode, Phone)
-        VALUES (@Email, @PasswordHash, @Name, GETDATE(), @MarketingOptIn, @isVerified, @verificationCode, @Phone)
+        INSERT INTO Users (Email, PasswordHash, Name, CreatedAt, MarketingOptIn, isVerified, verificationToken, Phone)
+        VALUES (@Email, @PasswordHash, @Name, GETDATE(), @MarketingOptIn, @isVerified, @verificationToken, @Phone)
       `);
 
     await sendEmail(
@@ -106,7 +106,7 @@ router.post("/verify-code", async (req, res) => {
       .request()
       .input("Email", sql.NVarChar, email)
       .input("Code", sql.NVarChar, code)
-      .query("SELECT * FROM Users WHERE Email = @Email AND verificationCode = @Code");
+      .query("SELECT * FROM Users WHERE Email = @Email AND verificationToken = @Code"); // ✅ FIXED: was verificationCode
 
     if (result.recordset.length === 0) {
       return res.status(400).json({ message: "Invalid verification code." });
@@ -115,7 +115,7 @@ router.post("/verify-code", async (req, res) => {
     await pool
       .request()
       .input("Email", sql.NVarChar, email)
-      .query("UPDATE Users SET isVerified = 1, verificationCode = NULL WHERE Email = @Email");
+      .query("UPDATE Users SET isVerified = 1, verificationToken = NULL WHERE Email = @Email"); // ✅ FIXED: was verificationCode
 
     res.json({ message: "✅ Email verified successfully." });
   } catch (err) {
@@ -240,6 +240,7 @@ router.post("/account/update", async (req, res) => {
 
 
 module.exports = router;
+
 
 
 

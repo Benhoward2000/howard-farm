@@ -22,6 +22,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { ToastContainer } from 'react-toastify';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import 'react-toastify/dist/ReactToastify.css';
+const GOOGLE_LIBRARIES: ("places")[] = ["places"];
 
 const App = () => {
   const [currentPage, setPage] = useState<string>('Home');
@@ -112,9 +113,9 @@ const App = () => {
   return (
     <HelmetProvider>
       <LoadScript
-        googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY as string}
-        libraries={['places']}
-      >
+  googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY as string}
+  libraries={GOOGLE_LIBRARIES}
+>
         <Router>
   <div className="min-h-screen bg-white flex flex-col">
     <header className="shadow-sm">

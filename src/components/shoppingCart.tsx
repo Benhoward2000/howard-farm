@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Product } from "./StorePage";
 import CartCard from "./CartCard";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -22,6 +22,15 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
     email: "",
     phone: "",
   });
+
+  // Google autocomplete state
+  const [streetInput, setStreetInput] = useState("");
+  const [suggestions, setSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+  const [autocompleteService, setAutocompleteService] = useState<google.maps.places.AutocompleteService | null>(null);
+  const [sessionToken, setSessionToken] = useState<google.maps.places.AutocompleteSessionToken | null>(null);
+  const streetInputRef = useRef<HTMLInputElement>(null);
+  const [userTyping, setUserTyping] = useState(false);
+
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [selectedShippingOption, setSelectedShippingOption] = useState("local");
   const [shippingCost, setShippingCost] = useState(0);
@@ -33,6 +42,27 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
   const requiresLocalOnly = cart.some((p) => p.localPickupOnly);
   const totalAmount = cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantityInCart || 1), 0);
 
+  // Initialize Google autocomplete service
+  useEffect(() => {
+    if ((window as any).google) {
+      setAutocompleteService(new google.maps.places.AutocompleteService());
+      setSessionToken(new google.maps.places.AutocompleteSessionToken());
+    }
+  }, []);
+
+  // Fetch predictions when user types
+  useEffect(() => {
+    if (autocompleteService && streetInput.length > 2 && sessionToken && !user) {
+      autocompleteService.getPlacePredictions(
+        { input: streetInput, sessionToken },
+        (predictions) => setSuggestions(predictions || [])
+      );
+    } else {
+      setSuggestions([]);
+    }
+  }, [streetInput, autocompleteService, sessionToken, user]);
+
+  // Load user data if logged in
   useEffect(() => {
     if (user) {
       setShipping({
@@ -44,6 +74,7 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
         email: user.email || "",
         phone: user.phone || "",
       });
+      setStreetInput(user.street || "");
     }
   }, [user]);
 
@@ -53,6 +84,13 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
       setShippingCost(0);
     }
   }, [requiresLocalOnly]);
+
+  // Create a dependency that changes when cart quantities change
+  const cartTotalWeight = cart.reduce((sum, item) => {
+    const weight = parseFloat(String(item.weight || 0));
+    const quantity = item.quantityInCart || 1;
+    return sum + (weight * quantity);
+  }, 0);
 
   useEffect(() => {
     const fetchRates = async () => {
@@ -77,15 +115,50 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
           }),
         });
         const data = await res.json();
-        if (res.ok) setShippingOptions(data);
-        else setShippingOptions([]);
+        if (res.ok) {
+          setShippingOptions(data);
+          // Re-select current shipping option to update cost
+          if (selectedShippingOption !== "local") {
+            const currentOption = data.find((r: any) => r.rate_id === selectedShippingOption);
+            if (currentOption) {
+              setShippingCost(currentOption.rate);
+            } else {
+              // If selected option no longer exists, reset to local
+              setSelectedShippingOption("local");
+              setShippingCost(0);
+            }
+          }
+        } else {
+          setShippingOptions([]);
+        }
       } catch (err) {
         console.error("Error fetching rates:", err);
         setShippingOptions([]);
       }
     };
     fetchRates();
-  }, [shipping, cart, requiresLocalOnly]);
+  }, [shipping.street, shipping.city, shipping.state, shipping.zip, cart.length, cartTotalWeight, requiresLocalOnly]);
+
+  const handlePlaceSelect = (placeId: string) => {
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ placeId }, (results, status) => {
+      if (status === "OK" && results && results.length > 0) {
+        const address = results[0].address_components;
+        const get = (type: string) => address.find((a) => a.types.includes(type))?.long_name || "";
+
+        const parsedStreet = `${get("street_number")} ${get("route")}`;
+        setShipping((prev) => ({
+          ...prev,
+          street: parsedStreet,
+          city: get("locality") || get("sublocality") || "",
+          state: get("administrative_area_level_1"),
+          zip: get("postal_code"),
+        }));
+        setStreetInput(parsedStreet);
+        setSuggestions([]);
+      }
+    });
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -184,11 +257,66 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
 
       <h3 className="text-2xl font-bold mt-10 mb-2 text-center">Customer Information</h3>
       <div className="grid gap-4 md:grid-cols-2">
-        <input name="fullName" placeholder="Full Name" value={shipping.fullName} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />
-        {!requiresLocalOnly && <input name="street" placeholder="Street Address" value={shipping.street} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />}
-        {!requiresLocalOnly && <input name="city" placeholder="City" value={shipping.city} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />}
-        {!requiresLocalOnly && <input name="state" placeholder="State" value={shipping.state} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />}
-        {!requiresLocalOnly && <input name="zip" placeholder="Zip Code" value={shipping.zip} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />}
+        <input 
+          name="fullName" 
+          placeholder="Full Name" 
+          value={shipping.fullName} 
+          onChange={handleChange} 
+          required 
+          className="border rounded p-2" 
+          disabled={!!user} 
+        />
+
+        {!requiresLocalOnly && (
+          <div className="md:col-span-2 relative">
+            <input
+              ref={streetInputRef}
+              name="street"
+              placeholder="Street Address"
+              value={user ? shipping.street : streetInput}
+              onChange={(e) => {
+                if (!user) {
+                  setStreetInput(e.target.value);
+                  setUserTyping(true);
+                  setSuggestions([]);
+                }
+              }}
+              required
+              className="border rounded p-2 w-full"
+              disabled={!!user}
+            />
+
+            {!user && userTyping && suggestions.length > 0 && (
+              <ul
+                className="absolute bg-white border rounded mt-1 w-full shadow-lg z-10"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                {suggestions.map((s) => (
+                  <li
+                    key={s.place_id}
+                    className="p-2 hover:bg-gray-100 cursor-pointer"
+                    onMouseDown={() => {
+                      streetInputRef.current?.blur();
+                      setUserTyping(false);
+                      handlePlaceSelect(s.place_id);
+                    }}
+                  >
+                    {s.description}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {!requiresLocalOnly && (
+          <>
+            <input name="city" placeholder="City" value={shipping.city} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />
+            <input name="state" placeholder="State" value={shipping.state} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />
+            <input name="zip" placeholder="Zip Code" value={shipping.zip} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />
+          </>
+        )}
+
         <input name="email" placeholder="Email" value={shipping.email} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />
         <input name="phone" placeholder="Phone Number" value={shipping.phone} onChange={handleChange} required className="border rounded p-2" disabled={!!user} />
       </div>
@@ -215,7 +343,7 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
           <option value="local">🚜 Free Local Pickup ($0)</option>
           {!requiresLocalOnly && shippingOptions.map((rate) => (
             <option key={rate.rate_id} value={rate.rate_id}>
-              🚚 {rate.carrier} {rate.service} – ${rate.rate.toFixed(2)} {rate.delivery_days ? `(${rate.delivery_days}d)` : ""}
+              🚚 {rate.carrier} {rate.service} — ${rate.rate.toFixed(2)} {rate.delivery_days ? `(${rate.delivery_days}d)` : ""}
             </option>
           ))}
         </select>
@@ -270,18 +398,4 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
 };
 
 export default ShoppingCart;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

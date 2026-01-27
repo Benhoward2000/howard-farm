@@ -174,6 +174,7 @@ router.post("/rates", async (req, res) => {
       country: "US",
     };
 
+    // Calculate total weight in ounces
     const totalWeightOz = cartItems.reduce((sum, item) => {
       const weightOz = parseFloat(item.weight);
       const qty = parseInt(item.quantity) || 1;
@@ -185,23 +186,40 @@ router.post("/rates", async (req, res) => {
     
       return sum + weightOz * qty;
     }, 0);
-    
 
+    // Calculate parcel dimensions based on actual items
+    // For multiple items, we'll use the largest dimensions and stack/combine appropriately
+    let maxLength = 0;
+    let maxWidth = 0;
+    let totalHeight = 0;
+
+    cartItems.forEach(item => {
+      const length = parseFloat(item.length) || 6;
+      const width = parseFloat(item.width) || 6;
+      const height = parseFloat(item.height) || 6;
+      const qty = parseInt(item.quantity) || 1;
+
+      // Track the largest length and width (assuming items are packed side by side or nested)
+      maxLength = Math.max(maxLength, length);
+      maxWidth = Math.max(maxWidth, width);
+      
+      // Stack heights (assuming items are stacked vertically when multiples)
+      totalHeight += height * qty;
+    });
+
+    // Use calculated dimensions, with minimums for very small items
     const parcel = {
-      weight: parseFloat(totalWeightOz.toFixed(2)), // ✅ Keep weight as number
-      length: 6,
-      width: 6,
-      height: 6,
+      weight: parseFloat(totalWeightOz.toFixed(2)),
+      length: Math.max(maxLength, 3), // EasyPost minimum is typically 3 inches
+      width: Math.max(maxWidth, 3),
+      height: Math.max(totalHeight, 3),
     };
     
-    
-    
-    console.log("📦 Parcel weight (oz):", totalWeightOz);
+    console.log("📦 Total parcel weight (oz):", totalWeightOz);
+    console.log("📦 Calculated dimensions:", parcel);
     console.log("🛒 Cart items:", cartItems);
-    console.log("🧪 Parcel for EasyPost:", parcel);
     
     // Fix state abbreviations for both to_address and from_address
-   
     const stateMap = {
       "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR", "California": "CA",
       "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE", "Florida": "FL", "Georgia": "GA",
@@ -214,22 +232,18 @@ router.post("/rates", async (req, res) => {
       "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT", "Vermont": "VT",
       "Virginia": "VA", "Washington": "WA", "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
     };
-    
-    
 
-// Replace state names with abbreviations if needed
-if (toAddress?.state) {
-  toAddress.state = stateMap[toAddress.state] || toAddress.state;
-}
-if (fromAddress?.state) {
-  fromAddress.state = stateMap[fromAddress.state] || fromAddress.state;
-}
+    // Replace state names with abbreviations if needed
+    if (toAddress?.state) {
+      toAddress.state = stateMap[toAddress.state] || toAddress.state;
+    }
+    if (fromAddress?.state) {
+      fromAddress.state = stateMap[fromAddress.state] || fromAddress.state;
+    }
 
-    
     const shipmentResponse = await fetch("https://api.easypost.com/v2/shipments", {
       method: "POST",
       headers: {
-        
         Authorization: "Basic " + Buffer.from(process.env.EASYPOST_API_KEY + ":").toString("base64"),
         "Content-Type": "application/json",
       },
@@ -243,8 +257,8 @@ if (fromAddress?.state) {
     });
 
     const shipmentText = await shipmentResponse.text();
-console.log("🛑 Raw EasyPost response:", shipmentText);
-const shipmentData = JSON.parse(shipmentText);
+    console.log("🛑 Raw EasyPost response:", shipmentText);
+    const shipmentData = JSON.parse(shipmentText);
 
     if (shipmentData.error) {
       throw new Error(shipmentData.error.message);

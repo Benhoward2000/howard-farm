@@ -31,6 +31,7 @@ const CreateAccount: React.FC<Props> = ({ setPage }) => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Client-side validation
     if (password !== confirm) {
       showToast("Passwords do not match.", "error");
       return;
@@ -48,24 +49,71 @@ const CreateAccount: React.FC<Props> = ({ setPage }) => {
     setToast(null);
 
     try {
+      // Debug: Log the API URL being used
+      console.log("API Base URL:", apiBaseUrl);
+      console.log("Full endpoint:", `${apiBaseUrl}/api/auth/register`);
+
       const res = await fetch(`${apiBaseUrl}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, phone, password }),
       });
 
-      const data = await res.json();
+      // Debug: Log response status
+      console.log("Response status:", res.status);
+      console.log("Response ok:", res.ok);
+
+      // Try to parse response as JSON
+      let data;
+      const contentType = res.headers.get("content-type");
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+        console.log("Response data:", data);
+      } else {
+        // If response is not JSON, get text for debugging
+        const text = await res.text();
+        console.error("Non-JSON response:", text);
+        showToast("Server returned an unexpected response format.", "error");
+        return;
+      }
 
       if (!res.ok) {
-        showToast(data.message || "Registration failed.", "error");
+        // Handle specific error codes
+        if (res.status === 400) {
+          showToast(data.message || "Invalid input. Please check your information.", "error");
+        } else if (res.status === 409) {
+          showToast(data.message || "An account with this email already exists.", "error");
+        } else if (res.status === 500) {
+          showToast(data.message || "Server error. Please try again later.", "error");
+        } else {
+          showToast(data.message || "Registration failed.", "error");
+        }
         return;
       }
 
       showToast("✅ Account created! Redirecting to login...", "success");
       setTimeout(() => setPage("Login"), 1500);
+      
     } catch (err) {
-      console.error(err);
-      showToast("Server error. Try again later.", "error");
+      // Enhanced error logging
+      console.error("Registration error:", err);
+      
+      if (err instanceof TypeError) {
+        // Network error or CORS issue
+        console.error("Network error - possible causes:");
+        console.error("1. Backend server is not running");
+        console.error("2. API URL is incorrect:", apiBaseUrl);
+        console.error("3. CORS is not configured on the backend");
+        showToast("Cannot connect to server. Please check your connection.", "error");
+      } else if (err instanceof SyntaxError) {
+        // JSON parsing error
+        console.error("JSON parsing error - server might not be returning valid JSON");
+        showToast("Server returned invalid data.", "error");
+      } else {
+        // Generic error
+        showToast("An unexpected error occurred. Please try again.", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -172,6 +220,7 @@ const CreateAccount: React.FC<Props> = ({ setPage }) => {
 };
 
 export default CreateAccount;
+
 
 
 
