@@ -197,30 +197,29 @@ router.post("/rates", async (req, res) => {
     const jarHeight = 5.5;   // inches (pint jar + padding)
 
     if (totalItems === 1) {
-      // Single jar - minimal box
-      boxLength = 4;
-      boxWidth = 4;
+      // Single jar - minimal box with padding
+      boxLength = 6;
+      boxWidth = 6;
       boxHeight = 6;
     } else if (totalItems === 2) {
-      // 2 jars - side by side
-      boxLength = 8;
-      boxWidth = 4;
+      // 2 jars - side by side with padding
+      boxLength = 10;
+      boxWidth = 6;
       boxHeight = 6;
     } else if (totalItems === 3) {
-      // 3 jars - THIS IS THE KEY FIX
-      // USPS Small Flat Rate Box or similar: 8.625 x 5.375 x 1.625
-      // But 3 pint jars need more space, likely 2 rows
-      boxLength = 9;
-      boxWidth = 7;
+      // 3 jars - ACTUAL BOX SIZE YOU USE
+      // 3 jars in a row with bubble wrap + packing peanuts
+      boxLength = 12;
+      boxWidth = 6;
       boxHeight = 6;
     } else if (totalItems === 4) {
       // 4 jars - 2x2 arrangement
-      boxLength = 8;
+      boxLength = 12;
       boxWidth = 8;
       boxHeight = 6;
     } else if (totalItems <= 6) {
       // 5-6 jars - 2x3 arrangement
-      boxLength = 11;
+      boxLength = 14;
       boxWidth = 8;
       boxHeight = 6;
     } else {
@@ -228,13 +227,13 @@ router.post("/rates", async (req, res) => {
       const itemsPerLayer = Math.ceil(Math.sqrt(totalItems));
       const layers = Math.ceil(totalItems / (itemsPerLayer * itemsPerLayer));
       
-      boxLength = itemsPerLayer * jarDiameter + 2;
-      boxWidth = itemsPerLayer * jarDiameter + 2;
+      boxLength = itemsPerLayer * 4 + 4; // 4" per jar + padding
+      boxWidth = itemsPerLayer * 4 + 2;
       boxHeight = layers * jarHeight + 2;
     }
 
-    // Add packing material weight (bubble wrap, paper, etc.)
-    const packingWeightOz = totalItems * 2; // ~2 oz per jar for packing
+    // Add packing material weight (bubble wrap, packing peanuts, box, tape)
+    const packingWeightOz = Math.max(8, totalItems * 3); // Minimum 8 oz for small shipments, or 3 oz per jar
     const totalShippingWeight = totalWeightOz + packingWeightOz;
 
     const parcel = {
@@ -309,6 +308,7 @@ router.post("/rates", async (req, res) => {
     res.status(500).json({ error: "Failed to get shipping rates" });
   }
 });
+
 
 
 // Stripe PaymentIntent
