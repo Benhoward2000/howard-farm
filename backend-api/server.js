@@ -297,7 +297,7 @@ router.post("/rates", async (req, res) => {
     const rates = shipmentData.rates.map((rate) => ({
       carrier: rate.carrier,
       service: rate.service,
-      rate: parseFloat(rate.rate),
+      rate: parseFloat(rate.retail_rate), // Use retail_rate for customer-facing prices
       delivery_days: rate.delivery_days,
       rate_id: rate.id,
     }));
@@ -308,6 +308,7 @@ router.post("/rates", async (req, res) => {
     res.status(500).json({ error: "Failed to get shipping rates" });
   }
 });
+
 
 
 
