@@ -3,6 +3,7 @@ import { Product } from "./StorePage";
 import CartCard from "./CartCard";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { apiBaseUrl } from "../config";
+import { loadGoogleMaps } from "../utils/loadGoogleMaps";
 
 interface Props {
   cart: Product[];
@@ -44,10 +45,16 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
 
   // Initialize Google autocomplete service
   useEffect(() => {
-    if ((window as any).google) {
-      setAutocompleteService(new google.maps.places.AutocompleteService());
-      setSessionToken(new google.maps.places.AutocompleteSessionToken());
-    }
+    loadGoogleMaps()
+      .then(() => {
+        if ((window as any).google) {
+          setAutocompleteService(new google.maps.places.AutocompleteService());
+          setSessionToken(new google.maps.places.AutocompleteSessionToken());
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load Google Maps:', error);
+      });
   }, []);
 
   // Fetch predictions when user types
@@ -399,5 +406,6 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
 };
 
 export default ShoppingCart;
+
 
 

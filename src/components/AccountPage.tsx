@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { apiBaseUrl } from "../config";
 import { toast } from "react-toastify";
+import { loadGoogleMaps } from "../utils/loadGoogleMaps";
 
 interface Props {
   user: any;
@@ -52,12 +53,18 @@ const AccountPage: React.FC<Props> = ({ user, setPage, refreshUser }) => {
 
 
 
- // Create autocompleteService and sessionToken when Google Maps is loaded
+// Load Google Maps and create autocomplete service
 useEffect(() => {
-  if ((window as any).google) {
-    setAutocompleteService(new google.maps.places.AutocompleteService());
-    setSessionToken(new google.maps.places.AutocompleteSessionToken());
-  }
+  loadGoogleMaps()
+    .then(() => {
+      if ((window as any).google) {
+        setAutocompleteService(new google.maps.places.AutocompleteService());
+        setSessionToken(new google.maps.places.AutocompleteSessionToken());
+      }
+    })
+    .catch((error) => {
+      console.error('Failed to load Google Maps:', error);
+    });
 }, []);
 
 // Fetch predictions when user types
