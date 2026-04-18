@@ -24,6 +24,7 @@ interface Shipment {
   zip: string;
   email: string;
   phone: string;
+  preferredContact?: string;
   shippingMethod?: string;
   shippingCost?: number;
 }
@@ -46,6 +47,7 @@ interface RawOrder {
   zip: string;
   email: string;
   phone: string;
+  preferredContact?: string;
   shippingMethod?: string;
   shippingCost?: number;
 }
@@ -68,6 +70,7 @@ function groupByShipping(rows: RawOrder[]): Shipment[] {
         zip: row.zip,
         email: row.email,
         phone: row.phone,
+        preferredContact: row.preferredContact,
         shippingMethod: row.shippingMethod,
         shippingCost: row.shippingCost,
       });
@@ -201,6 +204,9 @@ const AdminOrdersPage: React.FC = () => {
                   <p><strong>Customer:</strong> {shipment.fullName}</p>
                   <p><strong>Address:</strong> {shipment.street}, {shipment.city}, {shipment.state} {shipment.zip}</p>
                   <p><strong>Email:</strong> {shipment.email} | <strong>Phone:</strong> {shipment.phone}</p>
+                  {shipment.preferredContact && (
+                    <p><strong>Preferred Contact:</strong> {shipment.preferredContact.charAt(0).toUpperCase() + shipment.preferredContact.slice(1)}</p>
+                  )}
                   {shipment.shippingMethod && (
                     <p>
                       <strong>Shipping:</strong> {shipment.shippingMethod}

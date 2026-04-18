@@ -37,6 +37,7 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
   const [selectedShippingOption, setSelectedShippingOption] = useState("local");
   const [shippingCost, setShippingCost] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [preferredContact, setPreferredContact] = useState("email");
 
   const stripe = useStripe();
   const elements = useElements();
@@ -192,6 +193,7 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
           : shippingOptions.find(r => r.rate_id === selectedShippingOption)?.service || "Unknown",
         shippingCost,
         paymentMethod: selectedShippingOption === "local" ? paymentMethod : "card",
+        preferredContact: selectedShippingOption === "local" ? preferredContact : undefined,
       };
 
       if (selectedShippingOption !== "local" || paymentMethod === "card") {
@@ -368,18 +370,32 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
       </div>
 
       {selectedShippingOption === "local" && (
-        <div className="mb-6">
-          <label className="block mb-2 font-medium">Payment Method</label>
-          <select
-            className="border rounded p-2 w-full"
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-          >
-            <option value="cash">Cash at Pickup</option>
-            <option value="venmo">Venmo at Pickup</option>
-            <option value="card">Credit Card</option>
-          </select>
-        </div>
+        <>
+          <div className="mb-6">
+            <label className="block mb-2 font-medium">Payment Method</label>
+            <select
+              className="border rounded p-2 w-full"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+            >
+              <option value="cash">Cash at Pickup</option>
+              <option value="venmo">Venmo at Pickup</option>
+              <option value="card">Credit Card</option>
+            </select>
+          </div>
+          <div className="mb-6">
+            <label className="block mb-2 font-medium">Preferred Contact Method</label>
+            <select
+              className="border rounded p-2 w-full"
+              value={preferredContact}
+              onChange={(e) => setPreferredContact(e.target.value)}
+            >
+              <option value="email">Email</option>
+              <option value="phone">Phone Call</option>
+              <option value="text">Text Message</option>
+            </select>
+          </div>
+        </>
       )}
 
       {selectedShippingOption !== "local" && (

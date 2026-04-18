@@ -297,7 +297,7 @@ router.post("/rates", async (req, res) => {
     const rates = shipmentData.rates.map((rate) => ({
       carrier: rate.carrier,
       service: rate.service,
-      rate: parseFloat(rate.retail_rate), // Use retail_rate for customer-facing prices
+      rate: parseFloat(rate.retail_rate || rate.rate),
       delivery_days: rate.delivery_days,
       rate_id: rate.id,
     }));
@@ -533,7 +533,7 @@ app.delete("/products/:id", isAuthenticated, async (req, res) => {
 
 // Final checkout route (only one!)
 app.post("/checkout", async (req, res) => {
-  const { shippingInfo, shippingMethod, shippingCost, cartItems } = req.body; // ✅ NEW
+  const { shippingInfo, shippingMethod, shippingCost, cartItems, preferredContact } = req.body;
 
   if (!shippingInfo || !Array.isArray(cartItems) || cartItems.length === 0) {
     return res.status(400).json({ error: "Missing shipping info or cart items." });
@@ -559,10 +559,11 @@ app.post("/checkout", async (req, res) => {
       .input("Zip", sql.NVarChar, shippingInfo.zip)
       .input("Email", sql.NVarChar, emailToUse)
       .input("Phone", sql.NVarChar, shippingInfo.phone)
+      .input("PreferredContact", sql.NVarChar, preferredContact || null)
       .query(`
-        INSERT INTO ShippingDetails (FullName, Street, City, State, Zip, Email, Phone, CreatedAt)
+        INSERT INTO ShippingDetails (FullName, Street, City, State, Zip, Email, Phone, PreferredContact, CreatedAt)
         OUTPUT INSERTED.Id
-        VALUES (@FullName, @Street, @City, @State, @Zip, @Email, @Phone, GETDATE())
+        VALUES (@FullName, @Street, @City, @State, @Zip, @Email, @Phone, @PreferredContact, GETDATE())
       `);
 
     const shippingId = shippingResult.recordset[0].Id;
@@ -649,6 +650,7 @@ app.post("/checkout", async (req, res) => {
         <h3>Shipping Address:</h3>
         <p>${firstRow.FullName}<br>${firstRow.Street}<br>${firstRow.City}, ${firstRow.State} ${firstRow.Zip}</p>
         <p><strong>Status:</strong> ${firstRow.OrderStatus}</p>
+        ${firstRow.PreferredContact ? `<p><strong>Preferred Contact:</strong> ${firstRow.PreferredContact}</p>` : ""}
         <hr />
         <p>This is a confirmation of your purchase. You’ll receive another email when your order ships.</p>
       `;
@@ -712,6 +714,7 @@ app.get("/api/admin/orders", isAuthenticated, async (req, res) => {
   s.Zip AS zip,
   s.Email AS email,
   s.Phone AS phone,
+  s.PreferredContact AS preferredContact,
   p.Name AS productName
 FROM Orders o
 JOIN ShippingDetails s ON o.ShippingId = s.Id
