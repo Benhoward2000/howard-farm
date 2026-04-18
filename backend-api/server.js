@@ -539,6 +539,10 @@ app.post("/checkout", async (req, res) => {
     return res.status(400).json({ error: "Missing shipping info or cart items." });
   }
 
+  if (!shippingInfo.email || !shippingInfo.phone) {
+    return res.status(400).json({ error: "Email and phone number are required." });
+  }
+
   const pool = await poolPromise;
   const transaction = new sql.Transaction(pool);
 
@@ -593,27 +597,27 @@ app.post("/checkout", async (req, res) => {
 
     await transaction.commit();
 
-    const insertedOrder = insertedOrders[0];
-    if (!insertedOrder || !insertedOrder.OrderId) {
+    if (!insertedOrders.length || !insertedOrders[0].OrderId) {
       throw new Error("Inserted order is missing or invalid.");
     }
 
     const result = await pool.request()
-      .input("OrderId", sql.Int, insertedOrder.OrderId)
+      .input("ShippingId", sql.Int, shippingId)
       .query(`
-        SELECT 
+        SELECT
           o.OrderId, o.ProductId, o.Quantity, o.Price, o.CreatedAt, o.OrderStatus,
-          o.TrackingNumber, o.ShippedAt, o.ShippingMethod, o.ShippingCost, -- ✅ NEW
+          o.TrackingNumber, o.ShippedAt, o.ShippingMethod, o.ShippingCost,
           p.Name AS ProductName,
           s.FullName, s.Street, s.City, s.State, s.Zip, s.Email, s.Phone
         FROM Orders o
         JOIN Products p ON o.ProductId = p.ProductId
         JOIN ShippingDetails s ON o.ShippingId = s.Id
-        WHERE o.OrderId = @OrderId
+        WHERE o.ShippingId = @ShippingId
       `);
 
-    const orderDetails = result.recordset[0];
-    const recipientEmail = orderDetails?.Email || shippingInfo.email;
+    const orderRows = result.recordset;
+    const firstRow = orderRows[0];
+    const recipientEmail = firstRow?.Email || shippingInfo.email;
 
     if (recipientEmail) {
       const transporter = nodemailer.createTransport({
@@ -626,33 +630,36 @@ app.post("/checkout", async (req, res) => {
         },
       });
 
-      const price = typeof orderDetails.Price === "number" ? orderDetails.Price : 0;
-      const quantity = typeof orderDetails.Quantity === "number" ? orderDetails.Quantity : 0;
-      const shippingFee = typeof orderDetails.ShippingCost === "number" ? orderDetails.ShippingCost : 0;
-      const total = price * quantity + shippingFee;
+      const shippingFee = typeof firstRow.ShippingCost === "number" ? firstRow.ShippingCost : 0;
+      const itemsTotal = orderRows.reduce((sum, row) => sum + row.Price * row.Quantity, 0);
+      const total = itemsTotal + shippingFee;
+
+      const itemsHtml = orderRows.map(row =>
+        `<p>${row.Quantity} × ${row.ProductName} @ $${parseFloat(row.Price).toFixed(2)}</p>`
+      ).join("");
 
       const emailHtml = `
-        <h2>Thank you for your order from Howard's Farm!</h2>
-        <p><strong>Order ID:</strong> ${orderDetails.OrderId}</p>
-        <p><strong>Date:</strong> ${new Date(orderDetails.CreatedAt).toLocaleString()}</p>
+        <h2>Thank you for your order from Howard’s Farm!</h2>
+        <p><strong>Order ID:</strong> ${firstRow.OrderId}</p>
+        <p><strong>Date:</strong> ${new Date(firstRow.CreatedAt).toLocaleString()}</p>
         <h3>Items Ordered:</h3>
-        <p>${quantity} × ${orderDetails.ProductName} @ $${price.toFixed(2)}</p>
-        <p><strong>Shipping:</strong> ${orderDetails.ShippingMethod || "N/A"} – $${shippingFee.toFixed(2)}</p>
+        ${itemsHtml}
+        <p><strong>Shipping:</strong> ${firstRow.ShippingMethod || "N/A"} – $${shippingFee.toFixed(2)}</p>
         <p><strong>Total:</strong> $${total.toFixed(2)}</p>
         <h3>Shipping Address:</h3>
-        <p>${orderDetails.FullName}<br>${orderDetails.Street}<br>${orderDetails.City}, ${orderDetails.State} ${orderDetails.Zip}</p>
-        <p><strong>Status:</strong> ${orderDetails.OrderStatus}</p>
+        <p>${firstRow.FullName}<br>${firstRow.Street}<br>${firstRow.City}, ${firstRow.State} ${firstRow.Zip}</p>
+        <p><strong>Status:</strong> ${firstRow.OrderStatus}</p>
         <hr />
         <p>This is a confirmation of your purchase. You’ll receive another email when your order ships.</p>
       `;
 
       try {
         await transporter.sendMail({
-          from: `"Howard's Farm" <${process.env.EMAIL_USER}>`,
-           to: [recipientEmail, process.env.ORDER_BCC],
+          from: `"Howard’s Farm" <${process.env.EMAIL_USER}>`,
+          to: [recipientEmail, process.env.ORDER_BCC],
           replyTo: process.env.ORDER_REPLY_TO,
           bcc: process.env.ORDER_BCC,
-          subject: `Your Howard's Farm Order #${orderDetails.OrderId}`,
+          subject: `Your Howard’s Farm Order #${firstRow.OrderId}`,
           html: emailHtml,
         });
       } catch (emailErr) {
@@ -660,7 +667,15 @@ app.post("/checkout", async (req, res) => {
       }
     }
 
-    res.status(200).json(orderDetails);
+    res.status(200).json({
+      ...firstRow,
+      items: orderRows.map(row => ({
+        OrderId: row.OrderId,
+        ProductName: row.ProductName,
+        Quantity: row.Quantity,
+        Price: row.Price,
+      })),
+    });
   } catch (err) {
     if (transaction._aborted !== true) {
       try {
@@ -708,6 +723,95 @@ ORDER BY o.CreatedAt DESC
   } catch (err) {
     console.error("Fetch orders error:", err.message);
     res.status(500).json({ error: "Failed to fetch orders" });
+  }
+});
+
+// Admin: Update ALL orders in a shipment by shippingId and send one consolidated email
+app.put("/api/admin/orders/by-shipping/:shippingId", isAuthenticated, async (req, res) => {
+  const { shippingId } = req.params;
+  const { orderStatus, trackingNumber } = req.body;
+
+  try {
+    const pool = await poolPromise;
+
+    const result = await pool.request()
+      .input("ShippingId", sql.Int, shippingId)
+      .query(`
+        SELECT o.OrderId, o.OrderStatus, o.Quantity, o.Price, o.ShippingEmailSent,
+               s.Email, s.FullName, s.Street, s.City, s.State, s.Zip,
+               p.Name AS ProductName
+        FROM Orders o
+        JOIN ShippingDetails s ON o.ShippingId = s.Id
+        JOIN Products p ON o.ProductId = p.ProductId
+        WHERE o.ShippingId = @ShippingId
+      `);
+
+    const orders = result.recordset;
+    if (!orders.length) return res.status(404).json({ error: "No orders found for this shipment." });
+
+    const wasShipped = orders[0].OrderStatus === "Shipped";
+    const anyAlreadyEmailed = orders.some(o => o.ShippingEmailSent);
+
+    await pool.request()
+      .input("ShippingId", sql.Int, shippingId)
+      .input("OrderStatus", sql.NVarChar, orderStatus)
+      .input("TrackingNumber", sql.NVarChar, trackingNumber || "")
+      .query(`
+        UPDATE Orders
+        SET OrderStatus = @OrderStatus,
+            TrackingNumber = @TrackingNumber,
+            ShippedAt = CASE
+                          WHEN @OrderStatus = 'Shipped' AND ShippedAt IS NULL THEN GETDATE()
+                          ELSE ShippedAt
+                        END
+        WHERE ShippingId = @ShippingId
+      `);
+
+    if (!wasShipped && orderStatus === "Shipped" && !anyAlreadyEmailed) {
+      const first = orders[0];
+      const itemsHtml = orders.map(o =>
+        `<p>${parseInt(o.Quantity)} × ${o.ProductName} @ $${parseFloat(o.Price).toFixed(2)}</p>`
+      ).join("");
+      const total = orders.reduce((sum, o) => sum + parseFloat(o.Price) * parseInt(o.Quantity), 0);
+
+      const transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST,
+        port: parseInt(process.env.EMAIL_PORT, 10),
+        secure: process.env.EMAIL_SECURE === "true",
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      });
+
+      const emailHtml = `
+        <h2>Your order has shipped from Howard's Farm! 📦</h2>
+        <p><strong>Date Shipped:</strong> ${new Date().toLocaleString()}</p>
+        <h3>Items Shipped:</h3>
+        ${itemsHtml}
+        <p><strong>Total:</strong> $${total.toFixed(2)}</p>
+        <h3>Shipping Address:</h3>
+        <p>${first.FullName}<br>${first.Street}<br>${first.City}, ${first.State} ${first.Zip}</p>
+        ${trackingNumber ? `<p><strong>Tracking Number:</strong> ${trackingNumber}</p>` : ""}
+        <hr />
+        <p>Thank you for shopping with us!</p>
+      `;
+
+      await transporter.sendMail({
+        from: `"Howard's Farm" <${process.env.EMAIL_USER}>`,
+        to: first.Email,
+        replyTo: process.env.ORDER_REPLY_TO,
+        bcc: process.env.ORDER_BCC,
+        subject: `📬 Your Howard's Farm Order Has Shipped!`,
+        html: emailHtml,
+      });
+
+      await pool.request()
+        .input("ShippingId", sql.Int, shippingId)
+        .query(`UPDATE Orders SET ShippingEmailSent = 1 WHERE ShippingId = @ShippingId`);
+    }
+
+    res.json({ message: "Shipment updated successfully" });
+  } catch (err) {
+    console.error("❌ Shipment update error:", err.message);
+    res.status(500).json({ error: "Failed to update shipment" });
   }
 });
 

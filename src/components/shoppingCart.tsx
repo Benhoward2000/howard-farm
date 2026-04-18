@@ -4,6 +4,7 @@ import CartCard from "./CartCard";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { apiBaseUrl } from "../config";
 import { loadGoogleMaps } from "../utils/loadGoogleMaps";
+import { toast } from "react-toastify";
 
 interface Props {
   cart: Product[];
@@ -174,6 +175,10 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
   };
 
   const handleCheckout = async () => {
+    if (!shipping.email || !shipping.phone) {
+      toast.error("Please add an email and phone number to your account before placing an order.");
+      return;
+    }
     try {
       const order = {
         shippingInfo: shipping,
@@ -351,7 +356,7 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
           <option value="local">🚜 Free Local Pickup ($0)</option>
           {!requiresLocalOnly && shippingOptions.map((rate) => (
             <option key={rate.rate_id} value={rate.rate_id}>
-              🚚 {rate.carrier} {rate.service} — ${rate.rate.toFixed(2)} {rate.delivery_days ? `(${rate.delivery_days}d)` : ""}
+              🚚 {rate.carrier} {rate.service} — ${(rate.rate ?? 0).toFixed(2)} {rate.delivery_days ? `(${rate.delivery_days}d)` : ""}
             </option>
           ))}
         </select>

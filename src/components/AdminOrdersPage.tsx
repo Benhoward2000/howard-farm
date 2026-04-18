@@ -2,10 +2,36 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { apiBaseUrl } from "../config";
 
-interface Order {
+interface OrderItem {
   orderId: number;
   productId: number;
+  productName: string;
+  quantity: number;
+  price: number;
+}
+
+interface Shipment {
   shippingId: number;
+  items: OrderItem[];
+  createdAt: string;
+  orderStatus: string;
+  trackingNumber: string;
+  shippedAt: string | null;
+  fullName: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  email: string;
+  phone: string;
+  shippingMethod?: string;
+  shippingCost?: number;
+}
+
+interface RawOrder {
+  orderId: number;
+  shippingId: number;
+  productId: number;
   productName: string;
   quantity: number;
   price: number;
@@ -24,8 +50,41 @@ interface Order {
   shippingCost?: number;
 }
 
+function groupByShipping(rows: RawOrder[]): Shipment[] {
+  const map = new Map<number, Shipment>();
+  for (const row of rows) {
+    if (!map.has(row.shippingId)) {
+      map.set(row.shippingId, {
+        shippingId: row.shippingId,
+        items: [],
+        createdAt: row.createdAt,
+        orderStatus: row.orderStatus,
+        trackingNumber: row.trackingNumber,
+        shippedAt: row.shippedAt,
+        fullName: row.fullName,
+        street: row.street,
+        city: row.city,
+        state: row.state,
+        zip: row.zip,
+        email: row.email,
+        phone: row.phone,
+        shippingMethod: row.shippingMethod,
+        shippingCost: row.shippingCost,
+      });
+    }
+    map.get(row.shippingId)!.items.push({
+      orderId: row.orderId,
+      productId: row.productId,
+      productName: row.productName,
+      quantity: row.quantity,
+      price: row.price,
+    });
+  }
+  return Array.from(map.values());
+}
+
 const AdminOrdersPage: React.FC = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [message, setMessage] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -35,7 +94,7 @@ const AdminOrdersPage: React.FC = () => {
     const fetchOrders = async () => {
       try {
         const res = await axios.get(`${apiBaseUrl}/api/admin/orders`, { withCredentials: true });
-        setOrders(res.data);
+        setShipments(groupByShipping(res.data));
       } catch (err) {
         console.error("Fetch error:", err);
         setMessage("❌ Failed to load orders.");
@@ -44,19 +103,16 @@ const AdminOrdersPage: React.FC = () => {
     fetchOrders();
   }, []);
 
-  const updateOrder = async (order: Order) => {
+  const updateShipment = async (shipment: Shipment) => {
     try {
       await axios.put(
-        `${apiBaseUrl}/api/admin/orders/${order.orderId}`,
-        {
-          orderStatus: order.orderStatus,
-          trackingNumber: order.trackingNumber,
-        },
+        `${apiBaseUrl}/api/admin/orders/by-shipping/${shipment.shippingId}`,
+        { orderStatus: shipment.orderStatus, trackingNumber: shipment.trackingNumber },
         { withCredentials: true }
       );
       setMessage("✅ Order updated.");
-      setOrders((prev) =>
-        prev.map((o) => (o.orderId === order.orderId ? { ...o, ...order } : o))
+      setShipments((prev) =>
+        prev.map((s) => (s.shippingId === shipment.shippingId ? { ...s, ...shipment } : s))
       );
     } catch (err) {
       console.error("Update error:", err);
@@ -64,10 +120,14 @@ const AdminOrdersPage: React.FC = () => {
     }
   };
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch = order.productName.toLowerCase().includes(searchText.toLowerCase());
-    const matchesStatus = statusFilter ? order.orderStatus === statusFilter : true;
-    const createdAt = new Date(order.createdAt);
+  const filteredShipments = shipments.filter((shipment) => {
+    const matchesSearch =
+      searchText === "" ||
+      shipment.items.some((item) =>
+        item.productName.toLowerCase().includes(searchText.toLowerCase())
+      );
+    const matchesStatus = statusFilter ? shipment.orderStatus === statusFilter : true;
+    const createdAt = new Date(shipment.createdAt);
     const now = new Date();
     let matchesDate = true;
     if (dateFilter === "7") {
@@ -84,7 +144,6 @@ const AdminOrdersPage: React.FC = () => {
 
       {message && <p className="text-red-600 font-semibold mb-4">{message}</p>}
 
-      {/* Filters */}
       <div className="flex flex-wrap items-end gap-4 mb-6">
         <input
           type="text"
@@ -123,78 +182,100 @@ const AdminOrdersPage: React.FC = () => {
         </div>
       </div>
 
-      {filteredOrders.length === 0 ? (
+      {filteredShipments.length === 0 ? (
         <p className="text-gray-600 italic">No matching orders found.</p>
       ) : (
         <div className="space-y-6">
-          {filteredOrders.map((order) => (
-            <div key={order.orderId} className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
-              <div className="grid md:grid-cols-2 gap-3 text-sm">
-                <p><strong>Order ID:</strong> {order.orderId}</p>
-                <p><strong>Product:</strong> {order.productName}</p>
-                <p><strong>Qty:</strong> {order.quantity} × ${order.price.toFixed(2)}</p>
-                <p><strong>Customer:</strong> {order.fullName}</p>
-                <p><strong>Address:</strong> {order.street}, {order.city}, {order.state} {order.zip}</p>
-                {order.shippingMethod && (
-                  <p>
-                    <strong>Shipping:</strong> {order.shippingMethod} - ${order.shippingCost?.toFixed(2)}
-                  </p>
-                )}
-                <p><strong>Email:</strong> {order.email} | <strong>Phone:</strong> {order.phone}</p>
-                <p><strong>Placed:</strong> {new Date(order.createdAt).toLocaleString()}</p>
-                {order.shippedAt && (
-                  <p><strong>Shipped:</strong> {new Date(order.shippedAt).toLocaleString()}</p>
-                )}
-              </div>
-
-              <div className="mt-4 grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Order Status</label>
-                  <select
-                    value={order.orderStatus}
-                    onChange={(e) =>
-                      setOrders((prev) =>
-                        prev.map((o) =>
-                          o.orderId === order.orderId ? { ...o, orderStatus: e.target.value } : o
-                        )
-                      )
-                    }
-                    className="border border-gray-300 rounded px-3 py-2 w-full"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Shipped">Shipped</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tracking Number</label>
-                  <input
-                    type="text"
-                    value={order.trackingNumber || ""}
-                    onChange={(e) =>
-                      setOrders((prev) =>
-                        prev.map((o) =>
-                          o.orderId === order.orderId
-                            ? { ...o, trackingNumber: e.target.value }
-                            : o
-                        )
-                      )
-                    }
-                    className="border border-gray-300 rounded px-3 py-2 w-full"
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={() => updateOrder(order)}
-                className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+          {filteredShipments.map((shipment) => {
+            const itemsTotal = shipment.items.reduce(
+              (sum, item) => sum + item.price * item.quantity,
+              0
+            );
+            return (
+              <div
+                key={shipment.shippingId}
+                className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white"
               >
-                💾 Save Changes
-              </button>
-            </div>
-          ))}
+                <div className="grid md:grid-cols-2 gap-3 text-sm">
+                  <p><strong>Shipment ID:</strong> {shipment.shippingId}</p>
+                  <p><strong>Customer:</strong> {shipment.fullName}</p>
+                  <p><strong>Address:</strong> {shipment.street}, {shipment.city}, {shipment.state} {shipment.zip}</p>
+                  <p><strong>Email:</strong> {shipment.email} | <strong>Phone:</strong> {shipment.phone}</p>
+                  {shipment.shippingMethod && (
+                    <p>
+                      <strong>Shipping:</strong> {shipment.shippingMethod}
+                      {shipment.shippingCost != null ? ` - $${shipment.shippingCost.toFixed(2)}` : ""}
+                    </p>
+                  )}
+                  <p><strong>Placed:</strong> {new Date(shipment.createdAt).toLocaleString()}</p>
+                  {shipment.shippedAt && (
+                    <p><strong>Shipped:</strong> {new Date(shipment.shippedAt).toLocaleString()}</p>
+                  )}
+                </div>
+
+                <div className="mt-3 text-sm">
+                  <strong>Items:</strong>
+                  <ul className="mt-1 space-y-1 pl-3">
+                    {shipment.items.map((item) => (
+                      <li key={item.orderId}>
+                        {item.quantity} × {item.productName} @ ${item.price.toFixed(2)}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 font-semibold">Items Total: ${itemsTotal.toFixed(2)}</p>
+                </div>
+
+                <div className="mt-4 grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Order Status</label>
+                    <select
+                      value={shipment.orderStatus}
+                      onChange={(e) =>
+                        setShipments((prev) =>
+                          prev.map((s) =>
+                            s.shippingId === shipment.shippingId
+                              ? { ...s, orderStatus: e.target.value }
+                              : s
+                          )
+                        )
+                      }
+                      className="border border-gray-300 rounded px-3 py-2 w-full"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Tracking Number</label>
+                    <input
+                      type="text"
+                      value={shipment.trackingNumber || ""}
+                      onChange={(e) =>
+                        setShipments((prev) =>
+                          prev.map((s) =>
+                            s.shippingId === shipment.shippingId
+                              ? { ...s, trackingNumber: e.target.value }
+                              : s
+                          )
+                        )
+                      }
+                      className="border border-gray-300 rounded px-3 py-2 w-full"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => updateShipment(shipment)}
+                  className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+                >
+                  💾 Save Changes
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -202,10 +283,3 @@ const AdminOrdersPage: React.FC = () => {
 };
 
 export default AdminOrdersPage;
-
-
-
-
-
-
-
