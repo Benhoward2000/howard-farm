@@ -23,18 +23,10 @@ jobs:
           cd backend-api
           npm install --omit=dev
 
-      - name: Copy backend to root-level deploy folder
-        run: |
-          mkdir deploy
-          cp -r backend-api/* deploy/
-
-      - name: Add dummy root file (optional)
-        run: echo "Howard's Farm backend" > deploy/startup.txt
-
       - name: Zip deployment
         run: |
-          cd deploy
-          zip -r ../release.zip .
+          cd backend-api
+          zip -r ../release.zip . --exclude="*.git*"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
