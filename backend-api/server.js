@@ -10,6 +10,9 @@ const { sql, poolPromise } = require("./db");
 const authRoutes = require("./Auth.js");
 const router = express.Router();
 const fetch = require("node-fetch");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const validator = require("validator");
 const app = express();
 const EASYPOST_API_KEY = process.env.EASYPOST_API_KEY; // load from .env
 const PORT = process.env.PORT || 3001;
@@ -41,7 +44,11 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(express.json({ limit: "10kb" }));
+
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: "Too many attempts, please try again later." } });
+const checkoutLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: "Too many requests, please slow down." } });
 
 app.use(
   session({
@@ -67,7 +74,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // Routes
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/shipping", router); // 👈 this exposes /api/shipping/validate-address
 
 // Root test route
@@ -143,7 +150,6 @@ if (wasValidated || treatAsValid) {
     res.status(500).json({
       valid: false,
       message: "Server error validating address",
-      raw: err,
     });
   }
 });
@@ -532,8 +538,8 @@ app.delete("/products/:id", isAuthenticated, async (req, res) => {
 
 
 // Final checkout route (only one!)
-app.post("/checkout", async (req, res) => {
-  const { shippingInfo, shippingMethod, shippingCost, cartItems, preferredContact } = req.body;
+app.post("/checkout", checkoutLimiter, async (req, res) => {
+  const { shippingInfo, shippingMethod, shippingCost, cartItems, preferredContact, paymentMethod } = req.body;
 
   if (!shippingInfo || !Array.isArray(cartItems) || cartItems.length === 0) {
     return res.status(400).json({ error: "Missing shipping info or cart items." });
@@ -576,12 +582,13 @@ app.post("/checkout", async (req, res) => {
         .input("Quantity", sql.Int, item.quantity)
         .input("Price", sql.Decimal(10, 2), item.price)
         .input("OrderStatus", sql.NVarChar, "Pending")
-        .input("ShippingMethod", sql.NVarChar, shippingMethod) // ✅ NEW
-        .input("ShippingCost", sql.Decimal(10, 2), shippingCost) // ✅ NEW
+        .input("ShippingMethod", sql.NVarChar, shippingMethod)
+        .input("ShippingCost", sql.Decimal(10, 2), shippingCost)
+        .input("PaymentMethod", sql.NVarChar, paymentMethod || "card")
         .query(`
-          INSERT INTO Orders (ShippingId, ProductId, Quantity, Price, CreatedAt, OrderStatus, ShippingMethod, ShippingCost)
+          INSERT INTO Orders (ShippingId, ProductId, Quantity, Price, CreatedAt, OrderStatus, ShippingMethod, ShippingCost, PaymentMethod)
           OUTPUT INSERTED.*
-          VALUES (@ShippingId, @ProductId, @Quantity, @Price, GETDATE(), @OrderStatus, @ShippingMethod, @ShippingCost)
+          VALUES (@ShippingId, @ProductId, @Quantity, @Price, GETDATE(), @OrderStatus, @ShippingMethod, @ShippingCost, @PaymentMethod)
         `);
 
       insertedOrders.push(orderResult.recordset[0]);
@@ -707,6 +714,7 @@ app.get("/api/admin/orders", isAuthenticated, async (req, res) => {
   o.OrderStatus AS orderStatus,
   o.TrackingNumber AS trackingNumber,
   o.ShippedAt AS shippedAt,
+  o.PaymentMethod AS paymentMethod,
   s.FullName AS fullName,
   s.Street AS street,
   s.City AS city,
@@ -726,6 +734,35 @@ ORDER BY o.CreatedAt DESC
   } catch (err) {
     console.error("Fetch orders error:", err.message);
     res.status(500).json({ error: "Failed to fetch orders" });
+  }
+});
+
+// Admin: Update customer/shipping details for a shipment
+app.put("/api/admin/shipping/:shippingId", isAuthenticated, async (req, res) => {
+  const { shippingId } = req.params;
+  const { fullName, street, city, state, zip, email, phone } = req.body;
+
+  try {
+    const pool = await poolPromise;
+    await pool.request()
+      .input("ShippingId", sql.Int, shippingId)
+      .input("FullName", sql.NVarChar, fullName)
+      .input("Street", sql.NVarChar, street)
+      .input("City", sql.NVarChar, city)
+      .input("State", sql.NVarChar, state)
+      .input("Zip", sql.NVarChar, zip)
+      .input("Email", sql.NVarChar, email)
+      .input("Phone", sql.NVarChar, phone)
+      .query(`
+        UPDATE ShippingDetails
+        SET FullName = @FullName, Street = @Street, City = @City,
+            State = @State, Zip = @Zip, Email = @Email, Phone = @Phone
+        WHERE Id = @ShippingId
+      `);
+    res.json({ message: "Shipping details updated." });
+  } catch (err) {
+    console.error("❌ Shipping update error:", err.message);
+    res.status(500).json({ error: "Failed to update shipping details." });
   }
 });
 
@@ -1039,16 +1076,24 @@ app.post("/contact", async (req, res) => {
       },
     });
 
+    const safeName = validator.escape(name);
+    const safeEmail = validator.escape(email);
+    const safeMessage = validator.escape(message).replace(/\n/g, "<br>");
+
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ error: "Invalid email address." });
+    }
+
     await transporter.sendMail({
       from: `"Howard's Farm Contact" <${process.env.EMAIL_USER}>`,
-      to: "benhoward2000@gmail.com",
-      subject: `New Contact Message from ${name}`,
+      to: process.env.CONTACT_EMAIL,
+      subject: `New Contact Message from ${safeName}`,
       html: `
         <h3>New Contact Form Message</h3>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Name:</strong> ${safeName}</p>
+        <p><strong>Email:</strong> ${safeEmail}</p>
         <p><strong>Message:</strong></p>
-        <p>${message}</p>
+        <p>${safeMessage}</p>
       `,
     });
 

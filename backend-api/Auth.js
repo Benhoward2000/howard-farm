@@ -65,7 +65,7 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Email already registered" });
     }
 
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(password, 12);
     const verificationCode = generateCode();
 
     await pool
