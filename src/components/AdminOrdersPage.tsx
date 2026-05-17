@@ -236,7 +236,16 @@ const AdminOrdersPage: React.FC = () => {
 
   const pendingCount = shipments.filter((s) => s.orderStatus === "Pending").length;
   const shippedCount = shipments.filter((s) => s.orderStatus === "Shipped").length;
-  const revenue      = shipments.filter((s) => s.orderStatus !== "Cancelled").reduce((sum, s) => sum + s.items.reduce((a, i) => a + i.price * i.quantity, 0), 0);
+  const revenueByYear = Array.from(
+    shipments
+      .filter((s) => s.orderStatus !== "Cancelled")
+      .reduce((map, s) => {
+        const year = new Date(s.createdAt).getFullYear();
+        const amount = s.items.reduce((a, i) => a + i.price * i.quantity, 0);
+        map.set(year, (map.get(year) ?? 0) + amount);
+        return map;
+      }, new Map<number, number>())
+  ).sort((a, b) => b[0] - a[0]);
 
   const allVisibleSelected = filteredShipments.length > 0 && filteredShipments.every((s) => selectedIds.has(s.shippingId));
 
@@ -261,7 +270,7 @@ const AdminOrdersPage: React.FC = () => {
       <h2 className="text-3xl font-bold text-gray-800 mb-6">Orders</h2>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm">
           <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
           <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Pending</p>
@@ -270,10 +279,21 @@ const AdminOrdersPage: React.FC = () => {
           <p className="text-2xl font-bold text-blue-600">{shippedCount}</p>
           <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Shipped</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-green-600">${revenue.toFixed(2)}</p>
-          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Total Revenue</p>
-        </div>
+      </div>
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-8">
+        <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Revenue by Year</p>
+        {revenueByYear.length === 0 ? (
+          <p className="text-gray-400 text-sm">No revenue yet</p>
+        ) : (
+          <div className="flex flex-wrap gap-6">
+            {revenueByYear.map(([year, amount]) => (
+              <div key={year}>
+                <p className="text-2xl font-bold text-green-600">${amount.toFixed(2)}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{year}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Filters */}

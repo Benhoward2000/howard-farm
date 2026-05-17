@@ -38,6 +38,7 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
   const [shippingCost, setShippingCost] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [preferredContact, setPreferredContact] = useState("email");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const stripe = useStripe();
   const elements = useElements();
@@ -176,10 +177,12 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
   };
 
   const handleCheckout = async () => {
+    if (isSubmitting) return;
     if (!shipping.email || !shipping.phone) {
       toast.error("Please add an email and phone number to your account before placing an order.");
       return;
     }
+    setIsSubmitting(true);
     try {
       const order = {
         shippingInfo: shipping,
@@ -235,6 +238,8 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
       alert(err.message || "Checkout failed");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -417,10 +422,11 @@ const ShoppingCart: React.FC<Props> = ({ cart, setCart, user, setPage, setLastOr
       )}
 
       <button
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
         onClick={handleCheckout}
+        disabled={isSubmitting}
       >
-        Submit Order
+        {isSubmitting ? "Submitting..." : "Submit Order"}
       </button>
     </div>
   );

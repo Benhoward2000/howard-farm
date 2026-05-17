@@ -649,7 +649,7 @@ app.post("/checkout", checkoutLimiter, async (req, res) => {
       const emailHtml = `
         <h2>Thank you for your order from Howard’s Farm!</h2>
         <p><strong>Order ID:</strong> ${firstRow.OrderId}</p>
-        <p><strong>Date:</strong> ${new Date(firstRow.CreatedAt).toLocaleString()}</p>
+        <p><strong>Date:</strong> ${new Date(firstRow.CreatedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}</p>
         <h3>Items Ordered:</h3>
         ${itemsHtml}
         <p><strong>Shipping:</strong> ${firstRow.ShippingMethod || "N/A"} – $${shippingFee.toFixed(2)}</p>
